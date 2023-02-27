@@ -14,7 +14,7 @@ from chemprop.v2.models.schedulers import NoamLR
 from chemprop.v2.models.utils import get_activation_function
 
 
-class MPNN(ABC, pl.LightningModule):
+class MultifidelityMPNN(ABC, pl.LightningModule):
     """An `MPNN` is comprised of a `MessagePassingBlock` and an FFN top-model. The former
     calculates learned encodings from an input molecule/reaction graph, and the latter takes these
     encodings as input to calculate a final prediction. The full model is trained end-to-end.
@@ -33,12 +33,13 @@ class MPNN(ABC, pl.LightningModule):
         mpn_block: MessagePassingBlock,
         n_tasks: int,
         ffn_hidden_dim: int = 300,
-        ffn_num_layers: int = 1,
+        ffn_num_layers: int = 2,
         dropout: float = 0.0,
         activation: str = "relu",
         criterion: Optional[Union[str, LossFunction]] = None,
         metrics: Optional[Iterable[Union[str, Metric]]] = None,
         task_weights: Optional[Tensor] = None,
+        mpn_block_low_fidelity: Optional[MessagePassingBlock] = None,
         warmup_epochs: int = 2,
         num_lrs: int = 1,
         init_lr: float = 1e-4,
@@ -49,9 +50,18 @@ class MPNN(ABC, pl.LightningModule):
         self.save_hyperparameters(ignore=["mpn_block"])
 
         self.mpn_block = mpn_block
-        self.ffn = self.build_ffn(
+        self.mpn_block_low_fidelity = mpn_block_low_fidelity
+        self.ffn_high_fidelity = self.build_ffn(
+            mpn_block.output_dim + 1,  # +1 for additional feature from low fidelity prediction
+            1,
+            ffn_hidden_dim,
+            ffn_num_layers,
+            dropout,
+            activation,
+        )
+        self.ffn_low_fidelity = self.build_ffn(
             mpn_block.output_dim,
-            n_tasks * self.n_targets,
+            1,
             ffn_hidden_dim,
             ffn_num_layers,
             dropout,
@@ -180,7 +190,14 @@ class MPNN(ABC, pl.LightningModule):
 
         NOTE: the type signature of `input` matches the underlying `encoder.forward()`
         """
-        return self.ffn(self.fingerprint(inputs, X_f=X_f))
+        if self.mpn_block_low_fidelity is not None:
+            low_fidelity_output = self.ffn_low_fidelity(self.mpn_block_low_fidelity(*inputs))
+        else:
+            low_fidelity_output = self.ffn_low_fidelity(self.mpn_block(*inputs))
+
+        high_fidelity_output = self.ffn_high_fidelity(self.fingerprint(inputs, X_f=low_fidelity_output))
+
+        return (high_fidelity_output, low_fidelity_output)
 
     def training_step(self, batch: TrainingBatch, batch_idx):
         bmg, X_vd, features, targets, weights, lt_targets, gt_targets = batch
@@ -188,9 +205,11 @@ class MPNN(ABC, pl.LightningModule):
         mask = targets.isfinite()
         targets = targets.nan_to_num(nan=0.0)
 
-        preds = self((bmg, X_vd), X_f=features)
+        high_fidelity_preds, low_fidelity_preds = self((bmg, X_vd), X_f=features)
 
-        l = self.criterion.calc(preds, targets).sum()
+        # TODO: add hyperparam for tradeoff between fidelity
+        l = self.criterion.calc(high_fidelity_preds, targets[:, 1].reshape(-1, 1)).sum() + \
+            self.criterion.calc(low_fidelity_preds, targets[:, 0].reshape(-1, 1)).sum()
 
         self.log("train/loss", l, prog_bar=True)
 
@@ -199,7 +218,7 @@ class MPNN(ABC, pl.LightningModule):
     def validation_step(self, batch: TrainingBatch, batch_idx: int = 0) -> tuple[list[Tensor], int]:
         *_, targets, _, lt_targets, gt_targets = batch
 
-        preds = self.predict_step(batch, batch_idx)[0]
+        preds, _ = self.predict_step(batch, batch_idx)[0]
 
         mask = targets.isfinite()
         targets = targets.nan_to_num(nan=0.0)
@@ -214,7 +233,7 @@ class MPNN(ABC, pl.LightningModule):
     def test_step(self, batch: TrainingBatch, batch_idx: int = 0):
         *_, targets, _, lt_targets, gt_targets = batch
 
-        preds, _ = self.predict_step(batch, batch_idx)
+        preds, _ = self.predict_step(batch, batch_idx)[0]
 
         mask = targets.isfinite()
         targets = targets.nan_to_num(nan=0.0)

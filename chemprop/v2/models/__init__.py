@@ -12,6 +12,7 @@ from .models import (
     DirichletClassificationMPNN,
     MulticlassMPNN,
     DirichletMulticlassMPNN,
+    MultifidelityRegressionMPNN,
     RegressionMPNN,
     MveRegressionMPNN,
     SpectralMPNN,

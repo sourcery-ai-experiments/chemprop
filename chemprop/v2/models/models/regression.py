@@ -3,9 +3,16 @@ from torch import Tensor
 from torch.nn import functional as F
 
 from chemprop.v2.models.models.base import MPNN
+from chemprop.v2.models.models.multifidelity import MultifidelityMPNN
 
 
 class RegressionMPNN(MPNN):
+    _DATASET_TYPE = "regression"
+    _DEFAULT_CRITERION = "mse"
+    _DEFAULT_METRIC = "rmse"
+
+
+class MultifidelityRegressionMPNN(MultifidelityMPNN):
     _DATASET_TYPE = "regression"
     _DEFAULT_CRITERION = "mse"
     _DEFAULT_METRIC = "rmse"
