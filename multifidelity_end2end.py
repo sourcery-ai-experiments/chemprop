@@ -12,6 +12,9 @@ from sklearn.model_selection import train_test_split
 from chemprop.v2 import data, featurizers, models
 from chemprop.v2.models import modules
 
+from noisefunctions import gauss_noise, const_noise
+from splitfunctions import split_by_prop_dict
+
 
 def main():
     parser = ArgumentParser()
@@ -19,7 +22,9 @@ def main():
     args = parser.parse_args()
 
     if args.model_type == "single_fidelity" and args.add_bias_to_make_lf > 0:
-        raise ValueError("Cannot add bias to make low fidelity data when model type is single fidelity")
+        raise ValueError(
+            "Cannot add bias to make low fidelity data when model type is single fidelity"
+        )
 
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
@@ -35,29 +40,78 @@ def main():
 
     model_dict = {
         "single_fidelity": models.RegressionMPNN(mp_block_hf, n_tasks=1),
-        "multi_target": models.RegressionMPNN(mp_block_hf, n_tasks=2),  # TODO: multi-target regression
-        "multi_fidelity": models.MultifidelityRegressionMPNN(mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf),  # TODO: multi-fidelity without weight sharing
-        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(mp_block_hf, n_tasks=1),  # multi-fidelity with weight sharing
+        "multi_target": models.RegressionMPNN(
+            mp_block_hf, n_tasks=2
+        ),  # TODO: multi-target regression
+        "multi_fidelity": models.MultifidelityRegressionMPNN(
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
+        ),  # TODO: multi-fidelity without weight sharing
+        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
+            mp_block_hf, n_tasks=1
+        ),  # multi-fidelity with weight sharing
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: multi-fidelity non-differentiable feature
     }
 
     mpnn = model_dict[args.model_type]
 
     # Data
-    data_df = pd.read_csv(args.data_file)
-    smis = data_df["smiles"].tolist()
+    data_df = pd.read_csv(args.data_file, index_col="smiles")
 
-    if args.add_bias_to_make_lf > 0:
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + 1
+    if args.add_noise_to_make_lf:
+        # Adding noise to data_df
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(
+            df=data_df, key_col=args.hf_col_name, std=args.add_noise_to_make_lf, seed=0
+        )
+
+    if args.add_bias_to_make_lf:
+        # Adding bias to data_df
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + const_noise(
+            df=data_df, key_col=args.hf_col_name, const=args.add_bias_to_make_lf, seed=0
+        )
+
+    if args.lf_superset_of_hf:
+        hf_frac = 1 / args.lf_hf_size_ratio
+        lf_df = data_df
+        hf_df = data_df.sample(frac=hf_frac, random_state=0)
+        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
+
+    else:
+        hf_frac = 1 / (args.lf_hf_size_ratio + 1)
+        hf_df = data_df.sample(frac=hf_frac, random_state=0)
+        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
+        lf_df = data_df.drop(index=hf_df.index)
+        data_df[args.lf_col_name][hf_df.index] = np.nan
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
+
     else:
-        targets = data_df[[args.lf_col_name, args.hf_col_name]].values
+        # Creating a list of train and test indexes
+        lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
+            df=pd.DataFrame(lf_df[args.lf_col_name])
+        )
+        hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
+            df=pd.DataFrame(hf_df[args.hf_col_name])
+        )
+        train_index = lf_train_index + hf_train_index
+        test_index = lf_test_index + hf_test_index
 
-    all_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(smis, targets)]
+        # Selecting the target values for each train and test
+        train_t = data_df.drop(index=test_index)[
+            [args.lf_col_name, args.hf_col_name]
+        ].values
+        test_t = data_df.drop(index=train_index)[
+            [args.lf_col_name, args.hf_col_name]
+        ].values
 
-    train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=0)
+        # Initializing the data
+        train_data = [
+            data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)
+        ]
+        test_data = [
+            data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)
+        ]
+
     train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=0)
 
     train_dset = data.MoleculeDataset(train_data, mgf)
@@ -70,8 +124,12 @@ def main():
         test_scaler = test_dset.normalize_targets()
 
     train_loader = data.MolGraphDataLoader(train_dset, batch_size=50, num_workers=12)
-    val_loader = data.MolGraphDataLoader(val_dset, batch_size=50, num_workers=12, shuffle=False)
-    test_loader = data.MolGraphDataLoader(test_dset, batch_size=50, num_workers=12, shuffle=False)
+    val_loader = data.MolGraphDataLoader(
+        val_dset, batch_size=50, num_workers=12, shuffle=False
+    )
+    test_loader = data.MolGraphDataLoader(
+        test_dset, batch_size=50, num_workers=12, shuffle=False
+    )
 
     # Train
     trainer = pl.Trainer(
@@ -118,11 +176,15 @@ def main():
         )
     else:
         preds_lf = [x[0].numpy()[0][0] for x in preds]
-        preds_hf = [x[0].numpy()[0][1] for x in preds]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
+        preds_hf = [
+            x[0].numpy()[0][1] for x in preds
+        ]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
 
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
         targets_lf = [x.targets[0] for x in test_data]
-        targets_hf = [x.targets[1] for x in test_data]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
+        targets_hf = [
+            x.targets[1] for x in test_data
+        ]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
 
         # TODO: unscale preds_{h,l}f and targets_{h,l}f for multi-fidelity
 
@@ -181,17 +243,41 @@ def eval_metrics(targets, preds):
     print(f"R2: {r2_score(targets, preds)}")
     return
 
-
 def add_args(parser: ArgumentParser):
-    parser.add_argument("--model_type", type=str, default="single_fidelity", choices=["single_fidelity", "multi_target", "multi_fidelity", "multi_fidelity_weight_sharing", "multi_fidelity_non_diff"])
-    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")  # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
-    parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
-    parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="single_fidelity",
+        choices=[
+            "single_fidelity",
+            "multi_target",
+            "multi_fidelity",
+            "multi_fidelity_weight_sharing",
+            "multi_fidelity_non_diff",
+        ],
+    )
+    parser.add_argument(
+        "--data_file", type=str, default="tests/data/gdb11_0.001.csv"
+    )  # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
+    parser.add_argument(
+        "--hf_col_name", type=str, default="h298"
+    )  # choices=["h298", "lambda_maxosc_tddft"]
+    parser.add_argument(
+        "--lf_col_name", type=str, default="h298_bias_1", required=False
+    )  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
     parser.add_argument("--add_bias_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
+
+    parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
+    parser.add_argument(
+        "--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"]
+    )
+    parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
+    parser.add_argument("--lf_superset_of_hf", action="store_true", default=False)
+
     return
 
 
