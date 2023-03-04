@@ -29,9 +29,9 @@ def main():
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
 
-    np.random.seed(0)
-    random.seed(0)
-    torch.manual_seed(0)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     # Model
     mgf = featurizers.MoleculeFeaturizer()
@@ -60,24 +60,24 @@ def main():
     if args.add_noise_to_make_lf:
         # Adding noise to data_df
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(
-            df=data_df, key_col=args.hf_col_name, std=args.add_noise_to_make_lf, seed=0
+            df=data_df, key_col=args.hf_col_name, std=args.add_noise_to_make_lf, seed=args.seed
         )
 
     if args.add_bias_to_make_lf:
         # Adding bias to data_df
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + const_noise(
-            df=data_df, key_col=args.hf_col_name, const=args.add_bias_to_make_lf, seed=0
+            df=data_df, key_col=args.hf_col_name, const=args.add_bias_to_make_lf, seed=args.seed
         )
 
     if args.lf_superset_of_hf:
         hf_frac = 1 / args.lf_hf_size_ratio
         lf_df = data_df
-        hf_df = data_df.sample(frac=hf_frac, random_state=0)
+        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
         data_df[args.hf_col_name] = hf_df[args.hf_col_name]
 
     else:
         hf_frac = 1 / (args.lf_hf_size_ratio + 1)
-        hf_df = data_df.sample(frac=hf_frac, random_state=0)
+        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
         data_df[args.hf_col_name] = hf_df[args.hf_col_name]
         lf_df = data_df.drop(index=hf_df.index)
         data_df[args.lf_col_name][hf_df.index] = np.nan
@@ -112,7 +112,7 @@ def main():
             data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)
         ]
 
-    train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=0)
+    train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
 
     train_dset = data.MoleculeDataset(train_data, mgf)
     val_dset = data.MoleculeDataset(val_data, mgf)
@@ -256,15 +256,10 @@ def add_args(parser: ArgumentParser):
             "multi_fidelity_non_diff",
         ],
     )
-    parser.add_argument(
-        "--data_file", type=str, default="tests/data/gdb11_0.001.csv"
-    )  # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
-    parser.add_argument(
-        "--hf_col_name", type=str, default="h298"
-    )  # choices=["h298", "lambda_maxosc_tddft"]
-    parser.add_argument(
-        "--lf_col_name", type=str, default="h298_bias_1", required=False
-    )  # choices=["h298_bias_1", "lambda_maxosc_stda"]
+    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")  
+    # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
+    parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
+    parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
     parser.add_argument("--add_bias_to_make_lf", type=float, default=0.0)
@@ -272,12 +267,10 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--export_train_and_val", action="store_true")
 
     parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
-    parser.add_argument(
-        "--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"]
-    )
+    parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", action="store_true", default=False)
-
+    parser.add_argument("--seed", type=int, default=0)
     return
 
 
