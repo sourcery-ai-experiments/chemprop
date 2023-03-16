@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from chemprop.v2 import data, featurizers, models
 from chemprop.v2.models import modules
 
-from noisefunctions import descriptor_bias
+from noisefunctions import descriptor_bias, gauss_noise
 from splitfunctions import split_by_prop_dict
 from rdkit import Chem
 from rdkit.Chem import Descriptors
@@ -60,11 +60,20 @@ def main():
     # Data
     data_df = pd.read_csv(args.data_file, index_col="smiles")
 
-    if args.add_pn_bias_to_make_lf:
+    if args.add_pn_bias_to_make_lf > 0:
         # Creating the coefficients for the polynomial function
         coefficients = np.random.uniform(-1,1,args.add_pn_bias_to_make_lf)
         # Adding bias calculated from the polynomial function of HF to data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients,list(data_df[args.hf_col_name]))
+
+    elif args.add_pn_bias_to_make_lf == 0:
+        # Initialize a constant bias between -1 to 1
+        constant_bias = np.random.uniform(-1,1)
+        # Add the constant bias to HF to make data_df LF column
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + [constant_bias for _ in range(len(data_df.index))]
+
+    if args.add_gauss_noise_to_make_lf:
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(df=data_df, key_col=args.hf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
     if args.add_descriptor_bias_to_make_lf:
         descriptors = [
@@ -268,7 +277,8 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--export_train_and_val", action="store_true")
 
     parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
-    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0) # (Order, value for x)
+    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1) # (Order, value for x)
+    parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", action="store_true", default=False)
