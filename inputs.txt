@@ -1,0 +1,4 @@
+000 multi_target False -1 0 1 False
+001 multi_fidelity True -1 0 1 False
+002 multi_fidelity False 3 0 10 True
+003 multi_fidelity False -1 1 1 False

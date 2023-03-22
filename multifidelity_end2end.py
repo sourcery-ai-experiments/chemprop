@@ -12,6 +12,11 @@ from sklearn.model_selection import train_test_split
 from chemprop.v2 import data, featurizers, models
 from chemprop.v2.models import modules
 
+from noisefunctions import descriptor_bias, gauss_noise
+from splitfunctions import split_by_prop_dict
+from rdkit import Chem
+from rdkit.Chem import Descriptors
+
 
 def main():
     parser = ArgumentParser()
@@ -24,9 +29,9 @@ def main():
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
 
-    np.random.seed(0)
-    random.seed(0)
-    torch.manual_seed(0)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     # Model
     mgf = featurizers.MoleculeFeaturizer()
@@ -45,22 +50,70 @@ def main():
     mpnn = model_dict[args.model_type]
 
     # Data
-    data_df = pd.read_csv(args.data_file)
-    smis = data_df["smiles"].tolist()
+    data_df = pd.read_csv(args.data_file, index_col="smiles")
 
-    if args.add_bias_to_make_lf > 0 or args.add_noise_to_make_lf > 0:
-        noise = np.random.normal(args.add_bias_to_make_lf, args.add_noise_to_make_lf, len(data_df))
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + noise
+    if args.add_pn_bias_to_make_lf > 0:
+        # Creating the coefficients for the polynomial function
+        coefficients = np.random.uniform(-1,1,args.add_pn_bias_to_make_lf)
+        # Adding bias calculated from the polynomial function of HF to data_df LF column
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients,list(data_df[args.hf_col_name]))
+
+    elif args.add_pn_bias_to_make_lf == 0:
+        # Initialize a constant bias between -1 to 1
+        constant_bias = np.random.uniform(-1,1)
+        # Add the constant bias to HF to make data_df LF column
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + [constant_bias for _ in range(len(data_df.index))]
+
+    if args.add_gauss_noise_to_make_lf:
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(df=data_df, key_col=args.hf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
+
+    if args.add_descriptor_bias_to_make_lf:
+        descriptors = [
+            Descriptors.qed, Descriptors.MolWt, Descriptors.BalabanJ,
+            Descriptors.BertzCT, Descriptors.HallKierAlpha, Descriptors.Ipc,
+            Descriptors.Kappa1, Descriptors.Kappa2, Descriptors.Kappa3,
+            Descriptors.LabuteASA,Descriptors.TPSA, Descriptors.MolLogP, 
+            Descriptors.MolMR
+        ]
+        # Creating the weight descriptor pair
+        coefficients = [(descriptor, np.random.uniform(-1,1)) for descriptor in descriptors]
+        # Adding bias calculated from normalized descriptors to data_df LF column
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + descriptor_bias(data_df, coefficients)[0]
+
+    if args.lf_superset_of_hf:
+        hf_frac = 1 / args.lf_hf_size_ratio
+        lf_df = data_df
+        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
+        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
+    else:
+        hf_frac = 1 / (args.lf_hf_size_ratio + 1)
+        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
+        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
+        lf_df = data_df.drop(index=hf_df.index)
+        data_df[args.lf_col_name][hf_df.index] = np.nan
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
     else:
-        targets = data_df[[args.lf_col_name, args.hf_col_name]].values
+        # Creating a list of train and test indexes
+        lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
+            df=pd.DataFrame(lf_df[args.lf_col_name])
+        )
+        hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
+            df=pd.DataFrame(hf_df[args.hf_col_name])
+        )
+        train_index = lf_train_index + hf_train_index
+        test_index = lf_test_index + hf_test_index
 
-    all_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(smis, targets)]
+        # Selecting the target values for each train and test
+        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
+        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values
 
-    train_data, test_data = train_test_split(all_data, test_size=0.1, random_state=0)
-    train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=0)
+        # Initializing the data
+        train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
+        test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
+
+    train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
 
     train_dset = data.MoleculeDataset(train_data, mgf)
     val_dset = data.MoleculeDataset(val_data, mgf)
@@ -224,10 +277,16 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
-    parser.add_argument("--add_bias_to_make_lf", type=float, default=0.0)
     parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
+    parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
+    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1) # (Order, value for x)
+    parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
+    parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
+    parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
+    parser.add_argument("--lf_superset_of_hf", action="store_true", default=False)
+    parser.add_argument("--seed", type=int, default=0)
     return
 
 
