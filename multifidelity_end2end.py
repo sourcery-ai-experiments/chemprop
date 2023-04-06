@@ -17,8 +17,6 @@ from splitfunctions import split_by_prop_dict
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 
-
-
 def main():
     parser = ArgumentParser()
     add_args(parser)
@@ -38,8 +36,8 @@ def main():
 
     # Model
     mgf = featurizers.MoleculeFeaturizer()
-    mp_block_hf = modules.molecule_block()
-    mp_block_lf = modules.molecule_block()
+    mp_block_hf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'?
+    mp_block_lf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'?
 
     model_dict = {
         "single_fidelity": models.RegressionMPNN(mp_block_hf, n_tasks=1),
@@ -54,6 +52,7 @@ def main():
         ),  # multi-fidelity with weight sharing
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: multi-fidelity non-differentiable feature
     }
+    # TODO: add option for multi-fidelity with evidential uncertainty?
 
     mpnn = model_dict[args.model_type]
 
@@ -93,7 +92,6 @@ def main():
         lf_df = data_df
         hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
         data_df[args.hf_col_name] = hf_df[args.hf_col_name]
-
     else:
         hf_frac = 1 / (args.lf_hf_size_ratio + 1)
         hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
@@ -170,12 +168,15 @@ def main():
             targets = np.array(targets)
 
         print("Test set")
-        eval_metrics(targets, preds)
+        mae, rmse, r2 = eval_metrics(targets, preds)
 
         if args.save_test_plot:
             plt.scatter(targets, preds)
             plt.xlabel("Target")
             plt.ylabel("Prediction")
+            plt.text(min(targets), max(preds),
+                     f"MAE: {mae:.2f}\nRMSE: {rmse:.2f}\nR^2: {r2:.2f}",
+                     fontsize=12, ha='left', va='top')
             plt.savefig("mf_test_preds.png")
 
         test_df = pd.DataFrame(
@@ -186,39 +187,63 @@ def main():
             }
         )
     else:
-        preds_lf = [x[0].numpy()[0][0] for x in preds]
-        preds_hf = [
-            x[0].numpy()[0][1] for x in preds
-        ]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
+
+        if args.model_type == "multi_target":
+            preds = np.array([x[0].numpy()[0] for x in preds])
+        elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":
+            preds = np.array([[[x[0][0].numpy(), x[0][1].numpy()]] for x in preds]).reshape(len(preds), 2)
+        else:
+            raise ValueError("Not implemented yet")  # TODO: multi-fidelity non-differentiable
+
+        preds = test_scaler.inverse_transform(preds)
+
+        preds_lf, preds_hf = preds[:, 0], preds[:, 1]  # TODO: are HF and LF ordered the same for multi-fidelity? this should be correct for multi-target
 
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
-        targets_lf = [x.targets[0] for x in test_data]
-        targets_hf = [
-            x.targets[1] for x in test_data
-        ]  # TODO: are these ordered the same for multi-fidelity? this should be correct for multi-target
+        targets = [x.targets for x in test_data]
+        targets = test_scaler.inverse_transform(targets)
+
+        targets_lf, targets_hf = targets[:, 0], targets[:, 1]
 
         # TODO: unscale preds_{h,l}f and targets_{h,l}f for multi-fidelity
 
-        # print("High Fidelity - Test set")
-        # eval_metrics(targets_hf, preds_hf)
-        # print("Low Fidelity - Test set")
-        # eval_metrics(targets_lf, preds_lf)
+        print("High Fidelity - Test set")
+        hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
+        print("Low Fidelity - Test set")
+        lf_mae, lf_rmse, lf_r2 = eval_metrics(targets_lf, preds_lf)
 
-        # if args.save_test_plot:
-        #     plt.scatter(targets_hf, preds_hf)
-        #     plt.savefig("mf_test_preds_hf.png")
-        #     plt.scatter(targets_lf, preds_lf)
-        #     plt.savefig("mf_test_preds_lf.png")
+        if args.save_test_plot:
+            fig, axes = plt.subplots(figsize=(6, 3), nrows=1, ncols=2)
 
-        # test_df = pd.DataFrame(
-        #     {
-        #         "smiles": test_smis,
-        #         args.hf_col_name: targets_hf.flatten(),
-        #         f"{args.hf_col_name}_preds": preds_hf.flatten(),
-        #         args.lf_col_name: targets_lf.flatten(),
-        #         f"{args.lf_col_name}_preds": preds_lf.flatten(),
-        #     }
-        # )
+            axes[0].scatter(targets_hf, preds_hf, alpha=0.3, label="High Fidelity")
+            axes[0].set_xlabel("Target")
+            axes[0].set_ylabel("Prediction")
+            axes[0].text(min(targets_hf), max(preds_hf),
+                     f"MAE: {hf_mae:.2f}\nRMSE: {hf_rmse:.2f}\nR^2: {hf_r2:.2f}",
+                     fontsize=12, ha='left', va='top')
+            axes[0].set_title("High Fidelity")
+
+            axes[1].scatter(targets_lf, preds_lf, alpha=0.3, label="Low Fidelity")
+            axes[1].set_xlabel("Target")
+            axes[1].set_ylabel("Prediction")
+            axes[1].text(min(targets_lf), max(preds_lf),
+                     f"MAE: {lf_mae:.2f}\nRMSE: {lf_rmse:.2f}\nR^2: {lf_r2:.2f}",
+                     fontsize=12, ha='left', va='top')
+            axes[1].set_title("Low Fidelity")
+
+            plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
+
+            plt.savefig("mf_test_preds.png", bbox_inches="tight")
+
+        test_df = pd.DataFrame(
+            {
+                "smiles": test_smis,
+                args.hf_col_name: targets_hf.flatten(),
+                f"{args.hf_col_name}_preds": preds_hf.flatten(),
+                args.lf_col_name: targets_lf.flatten(),
+                f"{args.lf_col_name}_preds": preds_lf.flatten(),
+            }
+        )
 
     test_df.to_csv("mf_test_preds.csv", index=False)
 
@@ -249,10 +274,13 @@ def main():
 
 
 def eval_metrics(targets, preds):
-    print(f"MAE: {mean_absolute_error(targets, preds)}")
-    print(f"RMSE: {mean_squared_error(targets, preds, squared=False)}")
-    print(f"R2: {r2_score(targets, preds)}")
-    return
+    mae = mean_absolute_error(targets, preds)
+    rmse = mean_squared_error(targets, preds, squared=False)
+    r2 = r2_score(targets, preds)
+    print(f"MAE: {mae}")
+    print(f"RMSE: {rmse}")
+    print(f"R2: {r2}")
+    return mae, rmse, r2
 
 def add_args(parser: ArgumentParser):
     parser.add_argument(
@@ -273,6 +301,8 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
+
+    parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
 
