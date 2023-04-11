@@ -22,7 +22,7 @@ def main():
     add_args(parser)
     args = parser.parse_args()
 
-    if args.model_type == "single_fidelity" and args.add_bias_to_make_lf > 0:
+    if args.model_type == "single_fidelity" and (args.add_pn_bias_to_make_lf > 0 or args.add_gauss_noise_to_make_lf > 0 or args.add_descriptor_bias_to_make_lf):
         raise ValueError(
             "Cannot add bias to make low fidelity data when model type is single fidelity"
         )
@@ -302,7 +302,6 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
-    parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
     parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
