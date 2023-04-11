@@ -14,8 +14,8 @@ from chemprop.v2.models import modules
 
 from noisefunctions import descriptor_bias, gauss_noise
 from splitfunctions import split_by_prop_dict
-from rdkit import Chem
 from rdkit.Chem import Descriptors
+
 
 def main():
     parser = ArgumentParser()
@@ -61,13 +61,13 @@ def main():
 
     if args.add_pn_bias_to_make_lf > 0:
         # Creating the coefficients for the polynomial function
-        coefficients = np.random.uniform(-1,1,args.add_pn_bias_to_make_lf)
+        coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf)
         # Adding bias calculated from the polynomial function of HF to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients,list(data_df[args.hf_col_name]))
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
 
     elif args.add_pn_bias_to_make_lf == 0:
         # Initialize a constant bias between -1 to 1
-        constant_bias = np.random.uniform(-1,1)
+        constant_bias = np.random.uniform(-1, 1)
         # Add the constant bias to HF to make data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + [constant_bias for _ in range(len(data_df.index))]
 
@@ -79,11 +79,11 @@ def main():
             Descriptors.qed, Descriptors.MolWt, Descriptors.BalabanJ,
             Descriptors.BertzCT, Descriptors.HallKierAlpha, Descriptors.Ipc,
             Descriptors.Kappa1, Descriptors.Kappa2, Descriptors.Kappa3,
-            Descriptors.LabuteASA,Descriptors.TPSA, Descriptors.MolLogP, 
+            Descriptors.LabuteASA, Descriptors.TPSA, Descriptors.MolLogP,
             Descriptors.MolMR
         ]
         # Creating the weight descriptor pair
-        coefficients = [(descriptor, np.random.uniform(-1,1)) for descriptor in descriptors]
+        coefficients = [(descriptor, np.random.uniform(-1, 1)) for descriptor in descriptors]
         # Adding bias calculated from normalized descriptors to data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + descriptor_bias(data_df, coefficients)[0]
 
@@ -219,16 +219,16 @@ def main():
             axes[0].set_xlabel("Target")
             axes[0].set_ylabel("Prediction")
             axes[0].text(min(targets_hf), max(preds_hf),
-                     f"MAE: {hf_mae:.2f}\nRMSE: {hf_rmse:.2f}\nR^2: {hf_r2:.2f}",
-                     fontsize=12, ha='left', va='top')
+                         f"MAE: {hf_mae:.2f}\nRMSE: {hf_rmse:.2f}\nR^2: {hf_r2:.2f}",
+                         fontsize=12, ha='left', va='top')
             axes[0].set_title("High Fidelity")
 
             axes[1].scatter(targets_lf, preds_lf, alpha=0.3, label="Low Fidelity")
             axes[1].set_xlabel("Target")
             axes[1].set_ylabel("Prediction")
             axes[1].text(min(targets_lf), max(preds_lf),
-                     f"MAE: {lf_mae:.2f}\nRMSE: {lf_rmse:.2f}\nR^2: {lf_r2:.2f}",
-                     fontsize=12, ha='left', va='top')
+                         f"MAE: {lf_mae:.2f}\nRMSE: {lf_rmse:.2f}\nR^2: {lf_r2:.2f}",
+                         fontsize=12, ha='left', va='top')
             axes[1].set_title("Low Fidelity")
 
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
@@ -282,6 +282,7 @@ def eval_metrics(targets, preds):
     print(f"R2: {r2}")
     return mae, rmse, r2
 
+
 def add_args(parser: ArgumentParser):
     parser.add_argument(
         "--model_type",
@@ -295,19 +296,17 @@ def add_args(parser: ArgumentParser):
             "multi_fidelity_non_diff",
         ],
     )
-    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")  
+    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
-
     parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
-
     parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
-    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1) # (Order, value for x)
+    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1)  # (Order, value for x)
     parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
