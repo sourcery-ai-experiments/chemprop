@@ -97,18 +97,27 @@ def main():
         hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
         data_df[args.hf_col_name] = hf_df[args.hf_col_name]
         lf_df = data_df.drop(index=hf_df.index)
-        data_df[args.lf_col_name][hf_df.index] = np.nan
+        if not args.model_type == "single_fidelity":
+            data_df[args.lf_col_name][hf_df.index] = np.nan
 
+    hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
+            df=pd.DataFrame(hf_df[args.hf_col_name])
+        )
+    
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
+
+        train_index = hf_train_index
+        test_index = hf_test_index
+
+        # Selecting the target values for each train and test
+        train_t = data_df.drop(index=test_index)[[args.hf_col_name]].values
+        test_t = data_df.drop(index=train_index)[[args.hf_col_name]].values
 
     else:
         # Creating a list of train and test indexes
         lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
             df=pd.DataFrame(lf_df[args.lf_col_name])
-        )
-        hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
-            df=pd.DataFrame(hf_df[args.hf_col_name])
         )
         train_index = lf_train_index + hf_train_index
         test_index = lf_test_index + hf_test_index
@@ -117,9 +126,9 @@ def main():
         train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
         test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values
 
-        # Initializing the data
-        train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
-        test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
+    # Initializing the data
+    train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
+    test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
 
     train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
 
