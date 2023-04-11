@@ -17,14 +17,15 @@ from splitfunctions import split_by_prop_dict
 from rdkit import Chem
 from rdkit.Chem import Descriptors
 
-
 def main():
     parser = ArgumentParser()
     add_args(parser)
     args = parser.parse_args()
 
     if args.model_type == "single_fidelity" and args.add_bias_to_make_lf > 0:
-        raise ValueError("Cannot add bias to make low fidelity data when model type is single fidelity")
+        raise ValueError(
+            "Cannot add bias to make low fidelity data when model type is single fidelity"
+        )
 
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
@@ -40,9 +41,15 @@ def main():
 
     model_dict = {
         "single_fidelity": models.RegressionMPNN(mp_block_hf, n_tasks=1),
-        "multi_target": models.RegressionMPNN(mp_block_hf, n_tasks=2),  # TODO: multi-target regression
-        "multi_fidelity": models.MultifidelityRegressionMPNN(mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf),  # TODO: multi-fidelity without weight sharing
-        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(mp_block_hf, n_tasks=1),  # multi-fidelity with weight sharing
+        "multi_target": models.RegressionMPNN(
+            mp_block_hf, n_tasks=2
+        ),  # TODO: multi-target regression
+        "multi_fidelity": models.MultifidelityRegressionMPNN(
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
+        ),  # TODO: multi-fidelity without weight sharing
+        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
+            mp_block_hf, n_tasks=1
+        ),  # multi-fidelity with weight sharing
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: multi-fidelity non-differentiable feature
     }
     # TODO: add option for multi-fidelity with evidential uncertainty?
@@ -94,6 +101,7 @@ def main():
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
+
     else:
         # Creating a list of train and test indexes
         lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
@@ -125,8 +133,12 @@ def main():
         test_scaler = test_dset.normalize_targets()
 
     train_loader = data.MolGraphDataLoader(train_dset, batch_size=50, num_workers=12)
-    val_loader = data.MolGraphDataLoader(val_dset, batch_size=50, num_workers=12, shuffle=False)
-    test_loader = data.MolGraphDataLoader(test_dset, batch_size=50, num_workers=12, shuffle=False)
+    val_loader = data.MolGraphDataLoader(
+        val_dset, batch_size=50, num_workers=12, shuffle=False
+    )
+    test_loader = data.MolGraphDataLoader(
+        test_dset, batch_size=50, num_workers=12, shuffle=False
+    )
 
     # Train
     trainer = pl.Trainer(
@@ -175,6 +187,7 @@ def main():
             }
         )
     else:
+
         if args.model_type == "multi_target":
             preds = np.array([x[0].numpy()[0] for x in preds])
         elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":
@@ -269,17 +282,30 @@ def eval_metrics(targets, preds):
     print(f"R2: {r2}")
     return mae, rmse, r2
 
-
 def add_args(parser: ArgumentParser):
-    parser.add_argument("--model_type", type=str, default="single_fidelity", choices=["single_fidelity", "multi_target", "multi_fidelity", "multi_fidelity_weight_sharing", "multi_fidelity_non_diff"])
-    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")  # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
+    parser.add_argument(
+        "--model_type",
+        type=str,
+        default="single_fidelity",
+        choices=[
+            "single_fidelity",
+            "multi_target",
+            "multi_fidelity",
+            "multi_fidelity_weight_sharing",
+            "multi_fidelity_non_diff",
+        ],
+    )
+    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")  
+    # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
+
     parser.add_argument("--add_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
+
     parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
     parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1) # (Order, value for x)
     parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
