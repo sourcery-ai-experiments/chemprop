@@ -66,13 +66,15 @@ def h298_split(df, cutoff_val: float = 0, seed: int = 0):
     # Allow for reproducibility
     random.seed(seed)
 
+    col_name = df.columns[0]
+
     # Initialize array
     test, train_val = [], []
 
     for index in tqdm(df.index):
 
         # If the enthalpy of the current entry has a value over the cutoff then add it to the potential train_val set
-        if df["h298"][index] >= cutoff_val:
+        if df[col_name][index] >= cutoff_val:
             train_val.append(index)
         # Otherwise send it to the potential test set
         else:

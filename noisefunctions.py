@@ -78,7 +78,7 @@ def uniform_rand_noise(df, key_col, rand_range, seed):
     noise = [random.uniform(rand_range[0],rand_range[1]) for index in range(len(df[key_col]))]
     return noise
 
-def descriptor_bias(df, *descriptors):
+def descriptor_bias(df, descriptors):
     """
     Given a series of descriptors and corresponding coefficients,
     calculates the weighted sum and returns it as a list of biases

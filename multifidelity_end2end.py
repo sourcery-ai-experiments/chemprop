@@ -59,13 +59,15 @@ def main():
     # Data
     data_df = pd.read_csv(args.data_file, index_col="smiles")
 
-    if args.add_pn_bias_to_make_lf > 0:
+    # Write for multiple noises to be added
+    
+    if args.add_pn_bias_to_make_lf:
         # Creating the coefficients for the polynomial function
         coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf)
         # Adding bias calculated from the polynomial function of HF to data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
 
-    elif args.add_pn_bias_to_make_lf == 0:
+    if args.add_constant_bias_to_make_lf:
         # Initialize a constant bias between -1 to 1
         constant_bias = np.random.uniform(-1, 1)
         # Add the constant bias to HF to make data_df LF column
@@ -87,25 +89,18 @@ def main():
         # Adding bias calculated from normalized descriptors to data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + descriptor_bias(data_df, coefficients)[0]
 
-    if args.lf_superset_of_hf:
-        hf_frac = 1 / args.lf_hf_size_ratio
-        lf_df = data_df
-        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
-        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
-    else:
-        hf_frac = 1 / (args.lf_hf_size_ratio + 1)
-        hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
-        data_df[args.hf_col_name] = hf_df[args.hf_col_name]
-        lf_df = data_df.drop(index=hf_df.index)
-        if not args.model_type == "single_fidelity":
-            data_df[args.lf_col_name][hf_df.index] = np.nan
+    # If no noise is added
+    if not args.add_descriptor_bias_to_make_lf and not args.add_constant_bias_to_make_lf and not args.add_gauss_noise_to_make_lf and not args.add_pn_bias_to_make_lf:
+        data_df[args.lf_col_name] = data_df[args.hf_col_name]
 
-    hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
-            df=pd.DataFrame(hf_df[args.hf_col_name])
-        )
-    
+
+
+
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
+
+        hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
+            df=data_df)
 
         train_index = hf_train_index
         test_index = hf_test_index
@@ -115,12 +110,33 @@ def main():
         test_t = data_df.drop(index=train_index)[[args.hf_col_name]].values
 
     else:
+
+        if args.lf_superset_of_hf:
+            hf_frac = 1 / args.lf_hf_size_ratio
+            lf_df = data_df
+            hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
+        else:
+            hf_frac = 1 / (args.lf_hf_size_ratio + 1)
+            hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
+            lf_df = data_df.drop(index=hf_df.index)
+
         # Creating a list of train and test indexes
+        hf_df.drop(args.lf_col_name, inplace=True, axis=1)
+        lf_df.drop(args.hf_col_name, inplace=True, axis=1)
+        
+        hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
+            df=hf_df
+        )
+
         lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
-            df=pd.DataFrame(lf_df[args.lf_col_name])
+            df=lf_df
         )
         train_index = lf_train_index + hf_train_index
         test_index = lf_test_index + hf_test_index
+
+        # Setting nan to specify LF and HF
+        data_df[args.hf_col_name].loc[lf_train_index+lf_test_index] = np.nan
+        data_df[args.lf_col_name].loc[hf_train_index+hf_test_index] = np.nan
 
         # Selecting the target values for each train and test
         train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
@@ -204,15 +220,31 @@ def main():
         else:
             raise ValueError("Not implemented yet")  # TODO: multi-fidelity non-differentiable
 
-        preds = test_scaler.inverse_transform(preds)
-
-        preds_lf, preds_hf = preds[:, 0], preds[:, 1]  # TODO: are HF and LF ordered the same for multi-fidelity? this should be correct for multi-target
-
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
-        targets = [x.targets for x in test_data]
-        targets = test_scaler.inverse_transform(targets)
+        targets = np.array([x.targets for x in test_data])
+        
+        if args.scale_data:
+            preds = test_scaler.inverse_transform(preds) 
+            targets = test_scaler.inverse_transform(targets)
 
-        targets_lf, targets_hf = targets[:, 0], targets[:, 1]
+        targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
+
+        for target, pred in zip(targets,preds):
+            # LF 
+            if not np.isnan(target[0]):
+                targets_lf.append(target[0])
+                preds_lf.append(pred[0])
+            # HF
+            if not np.isnan(target[1]):
+                targets_hf.append(target[1])
+                preds_hf.append(pred[1])
+
+        targets_hf = np.array(targets_hf)
+        targets_lf = np.array(targets_lf)
+        preds_hf = np.array(preds_hf)
+        preds_lf = np.array(preds_lf)
+
+
 
         # TODO: unscale preds_{h,l}f and targets_{h,l}f for multi-fidelity
 
@@ -244,13 +276,14 @@ def main():
 
             plt.savefig("mf_test_preds.png", bbox_inches="tight")
 
+
         test_df = pd.DataFrame(
             {
                 "smiles": test_smis,
-                args.hf_col_name: targets_hf.flatten(),
-                f"{args.hf_col_name}_preds": preds_hf.flatten(),
-                args.lf_col_name: targets_lf.flatten(),
-                f"{args.lf_col_name}_preds": preds_lf.flatten(),
+                args.hf_col_name: targets[:, 1].flatten(),
+                f"{args.hf_col_name}_preds": preds[:, 1].flatten(),
+                args.lf_col_name: targets[:, 0].flatten(),
+                f"{args.lf_col_name}_preds": preds[:, 0].flatten(),
             }
         )
 
@@ -296,7 +329,7 @@ def add_args(parser: ArgumentParser):
     parser.add_argument(
         "--model_type",
         type=str,
-        default="single_fidelity",
+        default= "multi_fidelity", # Change to single
         choices=[
             "single_fidelity",
             "multi_target",
@@ -311,14 +344,15 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
-    parser.add_argument("--num_epochs", type=int, default=30)
+    parser.add_argument("--num_epochs", type=int, default=2) # Change to 30
     parser.add_argument("--export_train_and_val", action="store_true")
-    parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true", default=False)
-    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=-1)  # (Order, value for x)
+    parser.add_argument("--add_descriptor_bias_to_make_lf", default=False)
+    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
+    parser.add_argument("--add_constant_bias_to_make_lf", default=True) # Change to False
     parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
-    parser.add_argument("--lf_superset_of_hf", action="store_true", default=False)
+    parser.add_argument("--lf_superset_of_hf", default=False)
     parser.add_argument("--seed", type=int, default=0)
     return
 
