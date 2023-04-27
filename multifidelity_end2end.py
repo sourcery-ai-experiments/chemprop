@@ -67,11 +67,9 @@ def main():
         # Adding bias calculated from the polynomial function of HF to data_df LF column
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
 
-    if args.add_constant_bias_to_make_lf:
-        # Initialize a constant bias between -1 to 1
-        constant_bias = np.random.uniform(-1, 1)
+    if args.add_constant_bias_to_make_lf != 0:
         # Add the constant bias to HF to make data_df LF column
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + [constant_bias for _ in range(len(data_df.index))]
+        data_df[args.lf_col_name] = data_df[args.hf_col_name] + args.add_constant_bias_to_make_lf
 
     if args.add_gauss_noise_to_make_lf:
         data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(df=data_df, key_col=args.hf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
@@ -345,15 +343,15 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
-    parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
+    parser.add_argument("--lf_col_name", type=str, default="h298_lf", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", type=str2bool, default=False)
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", type=str2bool, default=False)
     parser.add_argument("--add_descriptor_bias_to_make_lf", type=str2bool, default=False)
     parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
-    parser.add_argument("--add_constant_bias_to_make_lf", type=str2bool, default=False)
-    parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
+    parser.add_argument("--add_constant_bias_to_make_lf", type=float, default=0.0)
+    parser.add_argument("--add_gauss_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
