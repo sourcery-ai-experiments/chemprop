@@ -1,5 +1,5 @@
 import random
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentTypeError
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -241,8 +241,6 @@ def main():
         preds_hf = np.array(preds_hf)
         preds_lf = np.array(preds_lf)
 
-        # TODO: unscale preds_{h,l}f and targets_{h,l}f for multi-fidelity
-
         print("High Fidelity - Test set")
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
         print("Low Fidelity - Test set")
@@ -319,6 +317,18 @@ def eval_metrics(targets, preds):
     return mae, rmse, r2
 
 
+# use this approach instead of action="store_true" to be compatible with LLMapReduce on supercloud
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise ArgumentTypeError('Boolean value expected.')
+
+
 def add_args(parser: ArgumentParser):
     parser.add_argument(
         "--model_type",
@@ -336,17 +346,17 @@ def add_args(parser: ArgumentParser):
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
-    parser.add_argument("--scale_data", action="store_true")
-    parser.add_argument("--save_test_plot", action="store_true")
+    parser.add_argument("--scale_data", type=str2bool, default=False)
+    parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
-    parser.add_argument("--export_train_and_val", action="store_true")
-    parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true")
+    parser.add_argument("--export_train_and_val", type=str2bool, default=False)
+    parser.add_argument("--add_descriptor_bias_to_make_lf", type=str2bool, default=False)
     parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
-    parser.add_argument("--add_constant_bias_to_make_lf", action="store_true")
+    parser.add_argument("--add_constant_bias_to_make_lf", type=str2bool, default=False)
     parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
-    parser.add_argument("--lf_superset_of_hf", action="store_true")
+    parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
     return
 
