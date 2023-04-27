@@ -60,7 +60,7 @@ def main():
     data_df = pd.read_csv(args.data_file, index_col="smiles")
 
     # Write for multiple noises to be added
-    
+
     if args.add_pn_bias_to_make_lf:
         # Creating the coefficients for the polynomial function
         coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf)
@@ -93,9 +93,6 @@ def main():
     if not args.add_descriptor_bias_to_make_lf and not args.add_constant_bias_to_make_lf and not args.add_gauss_noise_to_make_lf and not args.add_pn_bias_to_make_lf:
         data_df[args.lf_col_name] = data_df[args.hf_col_name]
 
-
-
-
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
 
@@ -123,7 +120,7 @@ def main():
         # Creating a list of train and test indexes
         hf_df.drop(args.lf_col_name, inplace=True, axis=1)
         lf_df.drop(args.hf_col_name, inplace=True, axis=1)
-        
+
         hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
             df=hf_df
         )
@@ -135,8 +132,8 @@ def main():
         test_index = lf_test_index + hf_test_index
 
         # Setting nan to specify LF and HF
-        data_df[args.hf_col_name].loc[lf_train_index+lf_test_index] = np.nan
-        data_df[args.lf_col_name].loc[hf_train_index+hf_test_index] = np.nan
+        data_df[args.hf_col_name].loc[lf_train_index + lf_test_index] = np.nan
+        data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
 
         # Selecting the target values for each train and test
         train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
@@ -222,15 +219,15 @@ def main():
 
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
         targets = np.array([x.targets for x in test_data])
-        
+
         if args.scale_data:
-            preds = test_scaler.inverse_transform(preds) 
+            preds = test_scaler.inverse_transform(preds)
             targets = test_scaler.inverse_transform(targets)
 
         targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
 
-        for target, pred in zip(targets,preds):
-            # LF 
+        for target, pred in zip(targets, preds):
+            # LF
             if not np.isnan(target[0]):
                 targets_lf.append(target[0])
                 preds_lf.append(pred[0])
@@ -243,8 +240,6 @@ def main():
         targets_lf = np.array(targets_lf)
         preds_hf = np.array(preds_hf)
         preds_lf = np.array(preds_lf)
-
-
 
         # TODO: unscale preds_{h,l}f and targets_{h,l}f for multi-fidelity
 
@@ -275,7 +270,6 @@ def main():
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
 
             plt.savefig("mf_test_preds.png", bbox_inches="tight")
-
 
         test_df = pd.DataFrame(
             {
@@ -329,7 +323,7 @@ def add_args(parser: ArgumentParser):
     parser.add_argument(
         "--model_type",
         type=str,
-        default= "single_fidelity",
+        default="single_fidelity",
         choices=[
             "single_fidelity",
             "multi_target",
