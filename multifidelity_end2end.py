@@ -329,7 +329,7 @@ def add_args(parser: ArgumentParser):
     parser.add_argument(
         "--model_type",
         type=str,
-        default= "multi_fidelity", # Change to single
+        default= "single_fidelity",
         choices=[
             "single_fidelity",
             "multi_target",
