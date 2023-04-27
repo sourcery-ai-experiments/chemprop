@@ -59,20 +59,21 @@ def main():
     # Data
     data_df = pd.read_csv(args.data_file, index_col="smiles")
 
-    # Write for multiple noises to be added
+    # So multiple noises can be added on top of one another
+    data_df[args.lf_col_name] = data_df[args.hf_col_name]
 
     if args.add_pn_bias_to_make_lf:
         # Creating the coefficients for the polynomial function
         coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf)
         # Adding bias calculated from the polynomial function of HF to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.lf_col_name]))
 
     if args.add_constant_bias_to_make_lf != 0:
         # Add the constant bias to HF to make data_df LF column
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + args.add_constant_bias_to_make_lf
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + args.add_constant_bias_to_make_lf
 
     if args.add_gauss_noise_to_make_lf:
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + gauss_noise(df=data_df, key_col=args.hf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df=data_df, key_col=args.lf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
     if args.add_descriptor_bias_to_make_lf:
         descriptors = [
@@ -85,11 +86,7 @@ def main():
         # Creating the weight descriptor pair
         coefficients = [(descriptor, np.random.uniform(-1, 1)) for descriptor in descriptors]
         # Adding bias calculated from normalized descriptors to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.hf_col_name] + descriptor_bias(data_df, coefficients)[0]
-
-    # If no noise is added
-    if not args.add_descriptor_bias_to_make_lf and not args.add_constant_bias_to_make_lf and not args.add_gauss_noise_to_make_lf and not args.add_pn_bias_to_make_lf:
-        data_df[args.lf_col_name] = data_df[args.hf_col_name]
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(data_df, coefficients)[0]
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
@@ -108,8 +105,8 @@ def main():
 
         if args.lf_superset_of_hf:
             hf_frac = 1 / args.lf_hf_size_ratio
-            lf_df = data_df
-            hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
+            lf_df = data_df.copy()
+            hf_df = data_df.copy().sample(frac=hf_frac, random_state=args.seed)
         else:
             hf_frac = 1 / (args.lf_hf_size_ratio + 1)
             hf_df = data_df.sample(frac=hf_frac, random_state=args.seed)
@@ -130,12 +127,14 @@ def main():
         test_index = lf_test_index + hf_test_index
 
         # Setting nan to specify LF and HF
-        data_df[args.hf_col_name].loc[lf_train_index + lf_test_index] = np.nan
-        data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
+        not_hf_index = list(set(lf_train_index + lf_test_index).difference(set(hf_train_index + hf_test_index)))
+        data_df[args.hf_col_name].loc[not_hf_index] = np.nan
+        if not args.lf_superset_of_hf:
+            data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
 
         # Selecting the target values for each train and test
-        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
-        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values
+        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values  # TODO: (!!) check order of LF and HF columns
+        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values  # TODO: (!!) should test data have HF targets removed?
 
     # Initializing the data
     train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
