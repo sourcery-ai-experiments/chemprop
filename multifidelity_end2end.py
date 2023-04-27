@@ -344,15 +344,15 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_col_name", type=str, default="h298_bias_1", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
     parser.add_argument("--scale_data", action="store_true")
     parser.add_argument("--save_test_plot", action="store_true")
-    parser.add_argument("--num_epochs", type=int, default=2) # Change to 30
+    parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", action="store_true")
-    parser.add_argument("--add_descriptor_bias_to_make_lf", default=False)
+    parser.add_argument("--add_descriptor_bias_to_make_lf", action="store_true")
     parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
-    parser.add_argument("--add_constant_bias_to_make_lf", default=True) # Change to False
+    parser.add_argument("--add_constant_bias_to_make_lf", action="store_true")
     parser.add_argument("--add_gauss_noise_to_make_lf", type=int, default=0)
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
-    parser.add_argument("--lf_superset_of_hf", default=False)
+    parser.add_argument("--lf_superset_of_hf", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     return
 
