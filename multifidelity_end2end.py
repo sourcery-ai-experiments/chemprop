@@ -47,12 +47,12 @@ def main():
             mp_block_hf, n_tasks=2
         ),
         "multi_fidelity": models.MultifidelityRegressionMPNN(
-            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf  # TODO: try to fix UserWarning about saving mpn_block_low_fidelity along with other hyperparams
         ),
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
         ),
-        # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: multi-fidelity non-differentiable feature
+        # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add other method: multi-fidelity with evidential uncertainty?
     # TODO: add other methods: transfer learning, deltaML, Bayesian methods, etc.
@@ -167,6 +167,8 @@ def main():
     test_loader = data.MolGraphDataLoader(
         test_dset, batch_size=50, num_workers=12, shuffle=False
     )
+
+    # TODO: (!!) add printout of HF/LF sizes, train-val-test sizes, etc
 
     # Train
     trainer = pl.Trainer(
