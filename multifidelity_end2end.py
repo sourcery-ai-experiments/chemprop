@@ -22,13 +22,15 @@ def main():
     add_args(parser)
     args = parser.parse_args()
 
-    if args.model_type == "single_fidelity" and (args.add_pn_bias_to_make_lf > 0 or args.add_gauss_noise_to_make_lf > 0 or args.add_descriptor_bias_to_make_lf):
+    if args.model_type == "single_fidelity" and (args.add_pn_bias_to_make_lf > 0 or args.add_gauss_noise_to_make_lf > 0 or args.add_descriptor_bias_to_make_lf > 0):
         raise ValueError(
             "Cannot add bias to make low fidelity data when model type is single fidelity"
         )
 
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
+
+    # TODO: (!!) cd to a results folder and output a log file with all the args
 
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -76,7 +78,7 @@ def main():
     if args.add_gauss_noise_to_make_lf:
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df=data_df, key_col=args.lf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
-    if args.add_descriptor_bias_to_make_lf:
+    if args.add_descriptor_bias_to_make_lf > 0:
         descriptors = [
             Descriptors.qed, Descriptors.MolWt, Descriptors.BalabanJ,
             Descriptors.BertzCT, Descriptors.HallKierAlpha, Descriptors.Ipc,
@@ -85,9 +87,12 @@ def main():
             Descriptors.MolMR
         ]
         # Creating the weight descriptor pair
-        coefficients = [(descriptor, np.random.uniform(-1, 1)) for descriptor in descriptors]
+        coefficients = np.random.uniform(-1, 1, len(descriptors)) * args.add_descriptor_bias_to_make_lf
+        descriptors_coefficients = list(zip(descriptors, coefficients))
         # Adding bias calculated from normalized descriptors to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(data_df, coefficients)[0]
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(data_df, descriptors_coefficients)
+
+    export_and_plot_hf_lf_data(data_df, args)
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
@@ -283,6 +288,36 @@ def main():
         export_train_and_val(args, train_data, val_data, train_scaler)
 
 
+def export_and_plot_hf_lf_data(data_df, args):
+
+    data_df.to_csv("lf_hf_targets.csv", float_format='%.6f')
+
+    lf = data_df[args.lf_col_name].values
+    hf = data_df[args.hf_col_name].values
+
+    plt.scatter(hf, lf, alpha=0.3)
+    plt.xlabel("High Fidelity")
+    plt.ylabel("Low Fidelity")
+
+    title = ""
+    if args.add_descriptor_bias_to_make_lf > 0:
+        title += f"Descriptor ({args.add_descriptor_bias_to_make_lf}); "
+    if args.add_pn_bias_to_make_lf > 0:
+        title += f"Poly ({args.add_pn_bias_to_make_lf}); "
+    if args.add_constant_bias_to_make_lf > 0:
+        title += f"Constant ({args.add_constant_bias_to_make_lf}); "
+    if args.add_gauss_noise_to_make_lf > 0:
+        title += f"Gaussian ({args.add_gauss_noise_to_make_lf}); "
+
+    if title.endswith("; "):
+        title = title[:-2]
+
+    plt.title(title)
+    plt.savefig("lf_vs_hf_targets.png")
+
+    return
+
+
 def export_train_and_val(args, train_data, val_data, train_scaler):
     train_smis = [x.smi for x in train_data]
     val_smis = [x.smi for x in val_data]
@@ -364,10 +399,10 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", type=str2bool, default=False)
-    parser.add_argument("--add_descriptor_bias_to_make_lf", type=str2bool, default=False)
     parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
     parser.add_argument("--add_constant_bias_to_make_lf", type=float, default=0.0)
     parser.add_argument("--add_gauss_noise_to_make_lf", type=float, default=0.0)
+    parser.add_argument("--add_descriptor_bias_to_make_lf", type=float, default=0.0)  # descriptor weights range from -N to N
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)

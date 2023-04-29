@@ -2,7 +2,7 @@ import random
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import Descriptors
-from sklearn import preprocessing
+from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 
 """
@@ -96,14 +96,17 @@ def descriptor_bias(df, descriptors):
     # Get mols objects from all the smiles indexes
     mols = list(map(Chem.MolFromSmiles, df.index))
     # Initialize the resulting array
-    result = np.zeros((1,len(df.index)))
+    lf_target = np.zeros((len(df.index), 1))
     # Iterate over the descriptor/coefficient pairs, normalize and add the 
     # weighted result to the result array
+    scaler = StandardScaler()
     for descriptor, coefficient in tqdm(descriptors):
-        pre_result = tuple(map(descriptor, mols.copy()))
-        result += np.array(preprocessing.normalize([pre_result]) * coefficient) 
-
-    return result
+        descriptor_results = np.array([descriptor(mol) for mol in mols])
+        scaled_descriptor_results = scaler.fit_transform(descriptor_results.reshape(-1, 1))
+        lf_target += np.array(scaled_descriptor_results * coefficient)
+    lf_target = lf_target.flatten()
+    
+    return lf_target
     
 global noise_dict
 
