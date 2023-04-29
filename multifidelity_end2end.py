@@ -70,13 +70,13 @@ def main():
         # Creating the coefficients for the polynomial function
         coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf + 1)  # need to add 1 because the one coefficient is for x^0
         # Adding bias calculated from the polynomial function of HF to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.lf_col_name]))
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
 
     if args.add_constant_bias_to_make_lf != 0.0:
         # Add the constant bias to HF to make data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + args.add_constant_bias_to_make_lf
 
-    if args.add_gauss_noise_to_make_lf > 0.0:  # TODO: (!) do we need the gauss_noise function or can we call np.random.normal directly?
+    if args.add_gauss_noise_to_make_lf > 0.0:
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df_len=len(data_df[args.lf_col_name]), std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
     if args.add_descriptor_bias_to_make_lf != 0.0:
