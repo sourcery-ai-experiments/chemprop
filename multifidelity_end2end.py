@@ -127,14 +127,15 @@ def main():
         test_index = lf_test_index + hf_test_index
 
         # Setting nan to specify LF and HF
-        not_hf_index = list(set(lf_train_index + lf_test_index).difference(set(hf_train_index + hf_test_index)))
-        data_df[args.hf_col_name].loc[not_hf_index] = np.nan
+        lf_not_hf_index = list(set(lf_train_index + lf_test_index).difference(set(hf_train_index + hf_test_index)))
+        data_df[args.hf_col_name].loc[lf_not_hf_index] = np.nan
         if not args.lf_superset_of_hf:
             data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
 
         # Selecting the target values for each train and test
-        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values  # TODO: (!!) check order of LF and HF columns
-        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values  # TODO: (!!) should test data have HF targets removed?
+        # LF column must be first, HF second to work with expected order in loss function during training
+        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
+        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values
 
     # Initializing the data
     train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
