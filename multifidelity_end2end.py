@@ -357,7 +357,7 @@ def export_train_and_val(args, train_data, val_data, train_scaler):
     return
 
 
-def eval_metrics(targets, preds):
+def eval_metrics(targets, preds):  # (!!) TODO: write CSV file with metrics in 2 (3) places where this is called above
     mae = mean_absolute_error(targets, preds)
     rmse = mean_squared_error(targets, preds, squared=False)
     r2 = r2_score(targets, preds)
