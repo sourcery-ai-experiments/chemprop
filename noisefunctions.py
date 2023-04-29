@@ -12,10 +12,11 @@ Note:
     When a new function is written, do not forget to add to noise_dict dictionary.
 """
 
-def gauss_noise(df, key_col, std, seed):
+
+def gauss_noise(df_len, std, seed):
     """
     Helper function that generates a gaussian curve of noises array
-    
+
     Parameters:
         df: pandas dataframe
             Dataframe to read from
@@ -25,20 +26,21 @@ def gauss_noise(df, key_col, std, seed):
             Standard deviation for the gaussian curve to add noise from
         seed: int
             Seed for randomness
-        
+
     Returns:
         An array of gaussian noises
     """
-    #Allows for reproducibility
+    # Allows for reproducibility
     np.random.seed(seed)
 
-    noise = np.random.normal(0, std, [len(df[key_col]),1], )
-    return np.concatenate(noise)    
+    noise = np.random.normal(0, std, [df_len, 1])
+    return np.concatenate(noise)
+
 
 def const_bias(df, key_col, const, seed):
     """
     Helper function that generates constant noises (biases) array
-    
+
     Parameters:
         df: pandas dataframe
             Dataframe to read from
@@ -48,17 +50,18 @@ def const_bias(df, key_col, const, seed):
             Constant value for the noise (bias)
         seed: int
             Not used
-        
+
     Returns:
         An array of constant noises
     """
     noise = [float(const) for index in range(len(df[key_col]))]
     return noise
 
+
 def uniform_rand_noise(df, key_col, rand_range, seed):
     """
     Helper function that generates a purely random noise array
-    
+
     Parameters:
         df: pandas dataframe
             Dataframe to read from
@@ -67,16 +70,17 @@ def uniform_rand_noise(df, key_col, rand_range, seed):
         rand_range: list
             Range of allowed random numbers
         seed: int
-            Seed for randomness   
-        
+            Seed for randomness
+
     Returns:
         An array of random noises within a range
     """
-    #Allows for reproducibility
+    # Allows for reproducibility
     random.seed(seed)
 
-    noise = [random.uniform(rand_range[0],rand_range[1]) for index in range(len(df[key_col]))]
+    noise = [random.uniform(rand_range[0], rand_range[1]) for index in range(len(df[key_col]))]
     return noise
+
 
 def descriptor_bias(df, descriptors):
     """
@@ -88,7 +92,7 @@ def descriptor_bias(df, descriptors):
             Dataframe to read from
         *descriptors: tuple
             Variable amount of tuples of descriptor and weight in bias
-    
+
     Returns:
         Numpy array of biases calculated from the weighted sum of the descriptor
         values
@@ -97,7 +101,7 @@ def descriptor_bias(df, descriptors):
     mols = list(map(Chem.MolFromSmiles, df.index))
     # Initialize the resulting array
     lf_target = np.zeros((len(df.index), 1))
-    # Iterate over the descriptor/coefficient pairs, normalize and add the 
+    # Iterate over the descriptor/coefficient pairs, normalize and add the
     # weighted result to the result array
     scaler = StandardScaler()
     for descriptor, coefficient in tqdm(descriptors):
@@ -105,13 +109,10 @@ def descriptor_bias(df, descriptors):
         scaled_descriptor_results = scaler.fit_transform(descriptor_results.reshape(-1, 1))
         lf_target += np.array(scaled_descriptor_results * coefficient)
     lf_target = lf_target.flatten()
-    
+
     return lf_target
-    
+
+
 global noise_dict
 
-noise_dict = {
-        'constant':const_bias,
-        'gauss':gauss_noise,
-        'random':uniform_rand_noise
-    }
+noise_dict = {"constant": const_bias, "gauss": gauss_noise, "random": uniform_rand_noise}

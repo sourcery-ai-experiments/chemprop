@@ -72,12 +72,12 @@ def main():
         # Adding bias calculated from the polynomial function of HF to data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.lf_col_name]))
 
-    if args.add_constant_bias_to_make_lf != 0:
+    if args.add_constant_bias_to_make_lf != 0.0:
         # Add the constant bias to HF to make data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + args.add_constant_bias_to_make_lf
 
     if args.add_gauss_noise_to_make_lf > 0.0:  # TODO: (!) do we need the gauss_noise function or can we call np.random.normal directly?
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df=data_df, key_col=args.lf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df_len=len(data_df[args.lf_col_name]), std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
     if args.add_descriptor_bias_to_make_lf != 0.0:
         descriptors = [
