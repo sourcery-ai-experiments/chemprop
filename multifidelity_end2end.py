@@ -60,7 +60,8 @@ def main():
     data_df = pd.read_csv(args.data_file, index_col="smiles")
 
     # So multiple noises can be added on top of one another
-    data_df[args.lf_col_name] = data_df[args.hf_col_name]
+    if not args.model_type == "single_fidelity":
+        data_df[args.lf_col_name] = data_df[args.hf_col_name]
 
     if args.add_pn_bias_to_make_lf:
         # Creating the coefficients for the polynomial function
@@ -97,9 +98,9 @@ def main():
         train_index = hf_train_index
         test_index = hf_test_index
 
-        # Selecting the target values for each train and test
-        train_t = data_df.drop(index=test_index)[[args.hf_col_name]].values
-        test_t = data_df.drop(index=train_index)[[args.hf_col_name]].values
+        # Selecting the target values for train and test
+        train_t = data_df.loc[train_index][[args.hf_col_name]].values
+        test_t = data_df.loc[test_index][[args.hf_col_name]].values
 
     else:
 
@@ -134,13 +135,14 @@ def main():
 
         # Selecting the target values for each train and test
         # LF column must be first, HF second to work with expected order in loss function during training
-        train_t = data_df.drop(index=test_index)[[args.lf_col_name, args.hf_col_name]].values
-        test_t = data_df.drop(index=train_index)[[args.lf_col_name, args.hf_col_name]].values
+        train_t = data_df.loc[train_index][[args.lf_col_name, args.hf_col_name]].values
+        test_t = data_df.loc[test_index][[args.lf_col_name, args.hf_col_name]].values
 
     # Initializing the data
     train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
     test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
 
+    # TODO: also do non-random split between train and val?
     train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
 
     train_dset = data.MoleculeDataset(train_data, mgf)
@@ -177,7 +179,6 @@ def main():
 
     if args.model_type == "single_fidelity":
         preds = [x[0].item() for x in preds]
-
         targets = [x.targets[0] for x in test_data]
 
         if args.scale_data:
@@ -207,7 +208,6 @@ def main():
             }
         )
     else:
-
         if args.model_type == "multi_target":
             preds = np.array([x[0].numpy()[0] for x in preds])
         elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":
@@ -277,32 +277,48 @@ def main():
             }
         )
 
-    test_df.to_csv("mf_test_preds.csv", index=False)
+    test_df.to_csv("mf_test_preds.csv", index=False, float_format='%.6f')
 
     if args.export_train_and_val:
-        train_smis = [x.smi for x in train_data]
-        val_smis = [x.smi for x in val_data]
+        export_train_and_val(args, train_data, val_data, train_scaler)
+
+
+def export_train_and_val(args, train_data, val_data, train_scaler):
+    train_smis = [x.smi for x in train_data]
+    val_smis = [x.smi for x in val_data]
+
+    if args.model_type == "single_fidelity":
         train_targets = np.array([x.targets[0] for x in train_data])
         val_targets = np.array([x.targets[0] for x in val_data])
+    else:
+        train_targets = np.array([x.targets for x in train_data])
+        val_targets = np.array([x.targets for x in val_data])
 
-        if args.scale_data:
+    if args.scale_data:
+        if args.model_type == "single_fidelity":
             train_targets = train_scaler.inverse_transform(train_targets.reshape(-1, 1))
             val_targets = train_scaler.inverse_transform(val_targets.reshape(-1, 1))
+        else:
+            train_targets = train_scaler.inverse_transform(train_targets)
+            val_targets = train_scaler.inverse_transform(val_targets)
 
-        train_df = pd.DataFrame(
-            {
-                "smiles": train_smis,
-                args.hf_col_name: train_targets.flatten(),
-            }
-        )
-        val_df = pd.DataFrame(
-            {
-                "smiles": val_smis,
-                args.hf_col_name: val_targets.flatten(),
-            }
-        )
-        train_df.to_csv("mf_train.csv", index=False)
-        val_df.to_csv("mf_val.csv", index=False)
+    train_dict = {"smiles": train_smis}
+    val_dict = {"smiles": val_smis}
+    if args.model_type == "single_fidelity":
+        train_dict[args.hf_col_name] = train_targets.flatten()
+        val_dict[args.hf_col_name] = val_targets.flatten()
+    else:
+        train_dict[args.lf_col_name] = train_targets[:, 0].flatten()
+        val_dict[args.lf_col_name] = val_targets[:, 0].flatten()
+        train_dict[args.hf_col_name] = train_targets[:, 1].flatten()
+        val_dict[args.hf_col_name] = val_targets[:, 1].flatten()
+
+    train_df = pd.DataFrame(train_dict)
+    val_df = pd.DataFrame(val_dict)
+    train_df.to_csv("mf_train.csv", index=False, float_format='%.6f')
+    val_df.to_csv("mf_val.csv", index=False, float_format='%.6f')
+
+    return
 
 
 def eval_metrics(targets, preds):
