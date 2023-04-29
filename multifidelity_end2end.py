@@ -38,23 +38,24 @@ def main():
 
     # Model
     mgf = featurizers.MoleculeFeaturizer()
-    mp_block_hf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'?
-    mp_block_lf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'?
+    mp_block_hf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'? (also on line below)
+    mp_block_lf = modules.molecule_block()
 
     model_dict = {
         "single_fidelity": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         "multi_target": models.RegressionMPNN(
             mp_block_hf, n_tasks=2
-        ),  # TODO: multi-target regression
+        ),
         "multi_fidelity": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
-        ),  # TODO: multi-fidelity without weight sharing
+        ),
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
-        ),  # multi-fidelity with weight sharing
+        ),
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: multi-fidelity non-differentiable feature
     }
-    # TODO: add option for multi-fidelity with evidential uncertainty?
+    # TODO: add other method: multi-fidelity with evidential uncertainty?
+    # TODO: add other methods: transfer learning, deltaML, Bayesian methods, etc.
 
     mpnn = model_dict[args.model_type]
 
@@ -65,9 +66,9 @@ def main():
     if not args.model_type == "single_fidelity":
         data_df[args.lf_col_name] = data_df[args.hf_col_name]
 
-    if args.add_pn_bias_to_make_lf:
+    if args.add_pn_bias_to_make_lf > 0:
         # Creating the coefficients for the polynomial function
-        coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf)
+        coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf + 1)  # need to add 1 because the one coefficient is for x^0
         # Adding bias calculated from the polynomial function of HF to data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.lf_col_name]))
 
@@ -75,10 +76,10 @@ def main():
         # Add the constant bias to HF to make data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + args.add_constant_bias_to_make_lf
 
-    if args.add_gauss_noise_to_make_lf:
+    if args.add_gauss_noise_to_make_lf > 0.0:  # TODO: (!) do we need the gauss_noise function or can we call np.random.normal directly?
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df=data_df, key_col=args.lf_col_name, std=args.add_gauss_noise_to_make_lf, seed=args.seed)
 
-    if args.add_descriptor_bias_to_make_lf > 0:
+    if args.add_descriptor_bias_to_make_lf != 0.0:
         descriptors = [
             Descriptors.qed, Descriptors.MolWt, Descriptors.BalabanJ,
             Descriptors.BertzCT, Descriptors.HallKierAlpha, Descriptors.Ipc,
@@ -147,7 +148,7 @@ def main():
     train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
     test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
 
-    # TODO: also do non-random split between train and val?
+    # TODO: (!) also do non-random split between train and val?
     train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
 
     train_dset = data.MoleculeDataset(train_data, mgf)
@@ -215,10 +216,8 @@ def main():
     else:
         if args.model_type == "multi_target":
             preds = np.array([x[0].numpy()[0] for x in preds])
-        elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":
+        elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":  # TODO: (!) will this also work for multi-fidelity non-differentiable?
             preds = np.array([[[x[0][0].numpy(), x[0][1].numpy()]] for x in preds]).reshape(len(preds), 2)
-        else:
-            raise ValueError("Not implemented yet")  # TODO: multi-fidelity non-differentiable
 
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
         targets = np.array([x.targets for x in test_data])
@@ -399,10 +398,11 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", type=str2bool, default=False)
-    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0)  # (Order, value for x)
-    parser.add_argument("--add_constant_bias_to_make_lf", type=float, default=0.0)
+    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0, help="order of the polynomial in x, for order >= 1")
+    parser.add_argument("--add_constant_bias_to_make_lf", type=float, default=0.0, help="use this instead of `--add_pn_bias_to_make_lf` for order = 0")
     parser.add_argument("--add_gauss_noise_to_make_lf", type=float, default=0.0)
-    parser.add_argument("--add_descriptor_bias_to_make_lf", type=float, default=0.0)  # descriptor weights range from -N to N
+    parser.add_argument("--add_descriptor_bias_to_make_lf", type=float, default=0.0, help="descriptor weights range from -N to N")
+    # TODO: add atom bias?
     parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
