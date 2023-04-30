@@ -16,7 +16,7 @@ echo "LF Superset of HF: " $9
 
 python multifidelity_end2end.py \
 --model_type $2 \
---data_file tests/data/gdb11_0.001.csv \
+--data_file /home/gridsan/kgreenman/mf_benchmark/chemprop/tests/data/gdb11_0.001.csv \
 --hf_col_name h298 \
 --lf_col_name h298_lf \
 --scale_data True \
@@ -30,4 +30,4 @@ python multifidelity_end2end.py \
 --split_type $7 \
 --lf_hf_size_ratio $8 \
 --lf_superset_of_hf $9 \
---seed 0 > $10 2>&1
+--seed 0 > ${10} 2>&1
