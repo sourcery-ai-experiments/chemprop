@@ -106,7 +106,8 @@ def main():
         # Adding bias calculated from normalized descriptors to data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(data_df, descriptors_coefficients)
 
-    export_and_plot_hf_lf_data(data_df, args)
+    if not args.model_type == "single_fidelity":
+        export_and_plot_hf_lf_data(data_df, args)
 
     if args.model_type == "single_fidelity":
         targets = data_df[[args.hf_col_name]].values.reshape(-1, 1)
