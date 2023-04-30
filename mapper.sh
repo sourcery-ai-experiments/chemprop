@@ -27,7 +27,7 @@ python multifidelity_end2end.py \
 --add_pn_bias_to_make_lf $4 \
 --add_constant_bias_to_make_lf $5 \
 --add_gauss_noise_to_make_lf $6 \
---split_type $7
+--split_type $7 \
 --lf_hf_size_ratio $8 \
 --lf_superset_of_hf $9 \
 --seed 0
