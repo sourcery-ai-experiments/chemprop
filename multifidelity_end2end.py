@@ -181,7 +181,14 @@ def main():
         test_dset, batch_size=50, num_workers=12, shuffle=False
     )
 
-    # TODO: (!!) add printout of HF/LF sizes, train-val-test sizes, etc
+    # Print sizes of datasets and splits
+    print("Total dataset size:", len(data_df))
+    print("HF total size:", len(hf_df))
+    print("HF train/val size:", len(hf_train_index))
+    print("HF test size:", len(hf_test_index))
+    print("LF total size:", len(lf_df))
+    print("LF train/val size:", len(lf_train_index))
+    print("LF test size:", len(lf_test_index))
 
     # Train
     trainer = pl.Trainer(
@@ -211,6 +218,9 @@ def main():
 
         print("Test set")
         mae, rmse, r2 = eval_metrics(targets, preds)
+        metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
+                                   "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
+        metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
             plt.scatter(targets, preds)
@@ -262,6 +272,9 @@ def main():
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
         print("Low Fidelity - Test set")
         lf_mae, lf_rmse, lf_r2 = eval_metrics(targets_lf, preds_lf)
+        metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
+                                   "MAE_lf": [lf_mae], "RMSE_lf": [lf_rmse], "R2_lf": [lf_r2]})
+        metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
             fig, axes = plt.subplots(figsize=(6, 3), nrows=1, ncols=2)
@@ -370,7 +383,7 @@ def export_train_and_val(args, train_data, val_data, train_scaler):
     return
 
 
-def eval_metrics(targets, preds):  # TODO: (!!) write CSV file with metrics in 2 (3) places where this is called above
+def eval_metrics(targets, preds):
     mae = mean_absolute_error(targets, preds)
     rmse = mean_squared_error(targets, preds, squared=False)
     r2 = r2_score(targets, preds)
