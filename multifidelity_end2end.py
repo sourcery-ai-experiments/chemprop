@@ -1,20 +1,22 @@
+import json
+import os
 import random
 from argparse import ArgumentParser, ArgumentTypeError
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
+from rdkit.Chem import Descriptors
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
 from chemprop.v2 import data, featurizers, models
 from chemprop.v2.models import modules
-
 from noisefunctions import descriptor_bias, gauss_noise
 from splitfunctions import split_by_prop_dict
-from rdkit.Chem import Descriptors
 
 
 def main():
@@ -30,7 +32,18 @@ def main():
     if args.model_type == "multi_fidelity_weight_sharing_non_diff":
         raise NotImplementedError("Not implemented yet")
 
-    # TODO: (!!) cd to a results folder and output a log file with all the args
+    # make unique folder for results of each run
+    os.makedirs("results", exist_ok=True)
+    os.chdir("results")
+    now = datetime.now()
+    datetime_string = now.strftime("%Y-%m-%d_%H-%M-%S.%f")
+    os.mkdir(datetime_string)
+    os.chdir(datetime_string)
+
+    # output args to a file
+    args_dict = vars(args)
+    with open("args.json", "w") as f:
+        json.dump(args_dict, f, indent=4)
 
     np.random.seed(args.seed)
     random.seed(args.seed)
@@ -54,8 +67,8 @@ def main():
         ),
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
-    # TODO: add other method: multi-fidelity with evidential uncertainty?
-    # TODO: add other methods: transfer learning, deltaML, Bayesian methods, etc.
+    # TODO: add method: multi-fidelity with evidential uncertainty?
+    # TODO: add methods: transfer learning, deltaML, Bayesian methods, etc.
 
     mpnn = model_dict[args.model_type]
 
@@ -172,7 +185,7 @@ def main():
 
     # Train
     trainer = pl.Trainer(
-        # logger=False,
+        logger=True,
         enable_checkpointing=False,
         enable_progress_bar=True,
         accelerator="gpu",
@@ -357,7 +370,7 @@ def export_train_and_val(args, train_data, val_data, train_scaler):
     return
 
 
-def eval_metrics(targets, preds):  # (!!) TODO: write CSV file with metrics in 2 (3) places where this is called above
+def eval_metrics(targets, preds):  # TODO: (!!) write CSV file with metrics in 2 (3) places where this is called above
     mae = mean_absolute_error(targets, preds)
     rmse = mean_squared_error(targets, preds, squared=False)
     r2 = r2_score(targets, preds)
