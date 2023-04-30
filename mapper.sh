@@ -30,4 +30,4 @@ python multifidelity_end2end.py \
 --split_type $7 \
 --lf_hf_size_ratio $8 \
 --lf_superset_of_hf $9 \
---seed 0
+--seed 0 > $10 2>&1
