@@ -14,8 +14,8 @@ for model_type in [
                     for split_type in [
                         "random",
                         # "scaffold",
-                        # "h298", 
-                        # "molwt", 
+                        # "h298",
+                        # "molwt",
                         # "atom",
                     ]:
                         for lf_hf_size_ratio in [1, 10]:
