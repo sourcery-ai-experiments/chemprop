@@ -47,7 +47,7 @@ class MultifidelityMPNN(ABC, pl.LightningModule):
         final_lr: float = 1e-4,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=["mpn_block"])
+        self.save_hyperparameters(ignore=["mpn_block", "mpn_block_low_fidelity"])
 
         self.mpn_block = mpn_block
         self.mpn_block_low_fidelity = mpn_block_low_fidelity

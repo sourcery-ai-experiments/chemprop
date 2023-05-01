@@ -60,7 +60,7 @@ def main():
             mp_block_hf, n_tasks=2
         ),
         "multi_fidelity": models.MultifidelityRegressionMPNN(
-            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf  # TODO: try to fix UserWarning about saving mpn_block_low_fidelity along with other hyperparams
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
         ),
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
