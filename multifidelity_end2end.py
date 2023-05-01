@@ -124,7 +124,7 @@ def main():
 
     else:
 
-        if args.lf_superset_of_hf:
+        if args.lf_superset_of_hf:  # TODO: (!!) are test sets different depending on LF:HF ratio? so compare within but not between?
             hf_frac = 1 / args.lf_hf_size_ratio
             lf_df = data_df.copy()
             hf_df = data_df.copy().sample(frac=hf_frac, random_state=args.seed)
