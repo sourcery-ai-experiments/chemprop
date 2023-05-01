@@ -2,7 +2,7 @@ command_str_list = []
 i = 0
 
 for model_type in [
-    # "single_fidelity",
+    # "single_fidelity",  # 000 single_fidelity 0 0 0 0 random 1 True
     "multi_target",
     "multi_fidelity",
     "multi_fidelity_weight_sharing",
