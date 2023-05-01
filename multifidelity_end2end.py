@@ -184,12 +184,13 @@ def main():
 
     # Print sizes of datasets and splits
     print("Total dataset size:", len(data_df))
-    print("HF total size:", len(hf_df))
-    print("HF train/val size:", len(hf_train_index))
-    print("HF test size:", len(hf_test_index))
-    print("LF total size:", len(lf_df))
-    print("LF train/val size:", len(lf_train_index))
-    print("LF test size:", len(lf_test_index))
+    if not args.model_type == "single_fidelity":
+        print("HF total size:", len(hf_df))
+        print("HF train/val size:", len(hf_train_index))
+        print("HF test size:", len(hf_test_index))
+        print("LF total size:", len(lf_df))
+        print("LF train/val size:", len(lf_train_index))
+        print("LF test size:", len(lf_test_index))
 
     # Train
     trainer = pl.Trainer(
