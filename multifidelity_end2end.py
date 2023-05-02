@@ -33,8 +33,8 @@ def main():
         raise NotImplementedError("Not implemented yet")
 
     # make unique folder for results of each run
-    os.makedirs("results", exist_ok=True)
-    os.chdir("results")
+    os.makedirs(args.results_dir, exist_ok=True)
+    os.chdir(args.results_dir)
     now = datetime.now()
     datetime_string = now.strftime("%Y-%m-%d_%H-%M-%S.%f")
     os.mkdir(datetime_string)
@@ -137,13 +137,14 @@ def main():
         hf_df.drop(args.lf_col_name, inplace=True, axis=1)
         lf_df.drop(args.hf_col_name, inplace=True, axis=1)
 
+        # TODO: (!) scaffold splits appear to not be reproducible???
         hf_train_index, hf_test_index = split_by_prop_dict[args.split_type](
             df=hf_df
         )
-
         lf_train_index, lf_test_index = split_by_prop_dict[args.split_type](
             df=lf_df
         )
+
         train_index = lf_train_index + hf_train_index
         test_index = lf_test_index + hf_test_index
 
@@ -433,10 +434,11 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--add_gauss_noise_to_make_lf", type=float, default=0.0)
     parser.add_argument("--add_descriptor_bias_to_make_lf", type=float, default=0.0, help="descriptor weights range from -N to N")
     # TODO: add atom bias?
-    parser.add_argument("--split_type", type=str, default="random", choices=["scaffold", "random", "h298", "molwt", "atom"])
+    parser.add_argument("--split_type", type=str, default="random", choices=["random", "scaffold", "h298", "molwt", "atom"])
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--results_dir", type=str, default="results")
     return
 
 

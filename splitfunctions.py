@@ -154,6 +154,9 @@ def random_split(df, sizes: tuple = (0.9, 0.1), seed: int = 0):
     """
     assert sum(sizes) == 1
 
+    # Allow for reproducibility
+    # random.seed(seed)  # is reproducible without this, keep commmented out to stay consistent
+
     train_val = list(df.sample(frac=sizes[0], random_state=seed).index)
     test = list(df.drop(train_val).index)
 
