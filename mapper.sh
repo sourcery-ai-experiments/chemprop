@@ -2,7 +2,7 @@
 
 source /etc/profile
 module load anaconda/2023a
-source activate chemprop
+source activate chempropmf
 
 echo "Model: " $2
 echo "Descriptor Bias: " $3
