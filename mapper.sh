@@ -16,7 +16,7 @@ echo "LF Superset of HF: " $9
 
 python multifidelity_end2end.py \
 --model_type $2 \
---data_file /home/gridsan/kgreenman/mf_benchmark/chemprop/tests/data/gdb11_0.001.csv \
+--data_file /home/gridsan/torkhon/chemprop-mf/tests/data/gdb11_0.001.csv \
 --hf_col_name h298 \
 --lf_col_name h298_lf \
 --scale_data True \
