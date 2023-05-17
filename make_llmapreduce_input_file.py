@@ -40,6 +40,8 @@ for seed in [0, 1, 2]:
                         command_str_list.append(command_str)
                         i += 1
 
+command_str_list = list(set(command_str_list))
+
 with open("inputs_orthogonal.txt", "w") as f:
     for i, command_str in enumerate(command_str_list):
         if i == 0:
