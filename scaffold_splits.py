@@ -1,14 +1,11 @@
 from collections import defaultdict
-import logging
 from random import Random
 from typing import Dict, List, Set, Tuple, Union
-import warnings
 
 from rdkit import Chem
 from rdkit.Chem.Scaffolds import MurckoScaffold
 from tqdm import tqdm
-import numpy as np
-import pandas as pd
+
 
 def generate_scaffold(mol: Union[str, Chem.Mol], include_chirality: bool = False) -> str:
     """
@@ -64,7 +61,7 @@ def scaffold_split(df,
     train_scaffold_count, val_scaffold_count, test_scaffold_count = 0, 0, 0
 
     # Map from scaffold to index in the data
-    scaffold_to_indices = scaffold_to_smiles(list(df.index)) #Removed use_indices for multifidelity benchmarking
+    scaffold_to_indices = scaffold_to_smiles(list(df.index))  # Removed use_indices for multifidelity benchmarking
 
     # Seed randomness
     random = Random(seed)
@@ -86,7 +83,7 @@ def scaffold_split(df,
         index_sets = sorted(list(scaffold_to_indices.values()),
                             key=lambda index_set: len(index_set),
                             reverse=True)
-    
+
     for index_set in index_sets:
         if len(train) + len(index_set) <= train_size:
             train += index_set
@@ -98,7 +95,7 @@ def scaffold_split(df,
             test += index_set
             test_scaffold_count += 1
 
-    #Changes made for multifidelity benchmarking
-    train_val = train+val
+    # Changes made for multifidelity benchmarking
+    train_val = train + val
 
     return (train_val, test)
