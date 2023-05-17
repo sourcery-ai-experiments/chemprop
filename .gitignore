@@ -173,5 +173,6 @@ chemprop/_version.py
 *.pkl
 *.pckl
 *.png
+*.pdf
 test_v2.py
 my_testing.sh
