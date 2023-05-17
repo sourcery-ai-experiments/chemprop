@@ -176,3 +176,4 @@ chemprop/_version.py
 *.pdf
 test_v2.py
 my_testing.sh
+*.tar.gz
