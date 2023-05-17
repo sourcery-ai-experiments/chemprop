@@ -12,6 +12,7 @@ echo "Gauss Noise: " $6
 echo "Split Type: " $7
 echo "LF-HF Size ratio: " $8
 echo "LF Superset of HF: " $9
+echo "Seed: " ${10}
 
 
 python multifidelity_end2end.py \
@@ -30,4 +31,4 @@ python multifidelity_end2end.py \
 --split_type $7 \
 --lf_hf_size_ratio $8 \
 --lf_superset_of_hf $9 \
---seed 0 > ${10} 2>&1
+--seed ${10} > ${11} 2>&1
