@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
+from pytorch_lightning import seed_everything
 import torch
 from rdkit.Chem import Descriptors
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
@@ -44,8 +45,6 @@ def main():
     with open("args.json", "w") as f:
         json.dump(args_dict, f, indent=4)
 
-    seed_everything(args.seed)
-
     mpnn = choose_model(args.model_type)
 
     # Data
@@ -55,6 +54,7 @@ def main():
     # Val and test are the same for LF and HF; train is separated later
     # TODO: (!) scaffold splits appear to not be reproducible???
     # TODO: (!) add in **kwargs from dicts for non-random split types
+    seed_everything(args.seed)
     train_val_smiles, test_smiles = split_by_prop_dict[args.split_type](df=data_df, seed=args.seed)
     train_val_df = data_df.loc[train_val_smiles]
     train_smiles, val_smiles = split_by_prop_dict[args.split_type](df=train_val_df, seed=args.seed)
@@ -108,6 +108,7 @@ def main():
     test_loader = data.MolGraphDataLoader(test_dset, batch_size=50, num_workers=12, shuffle=False)
 
     # Train
+    seed_everything(args.seed)
     trainer = pl.Trainer(
         logger=True,
         enable_checkpointing=False,
@@ -230,13 +231,6 @@ def main():
 
     if args.export_train_and_val:
         export_train_and_val(args, train_data, val_data, train_scaler)
-
-
-def seed_everything(seed: int):
-    np.random.seed(seed)
-    random.seed(seed)
-    torch.manual_seed(seed)
-    return
 
 
 def choose_model(model_type):
