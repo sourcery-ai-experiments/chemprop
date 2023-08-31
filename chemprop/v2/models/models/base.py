@@ -186,11 +186,12 @@ class MPNN(ABC, pl.LightningModule):
         bmg, X_vd, features, targets, weights, lt_targets, gt_targets = batch
 
         mask = targets.isfinite()
-        targets = targets.nan_to_num(nan=0.0)
+        targets = targets.nan_to_num(nan=0.0)  # TODO: is this causing problems?
 
         preds = self((bmg, X_vd), X_f=features)
 
-        l = self.criterion.calc(preds, targets).sum()
+        l = self.criterion.calc(preds, targets) * mask * weights
+        l = l.sum() / mask.sum()
 
         self.log("train/loss", l, prog_bar=True)
 
