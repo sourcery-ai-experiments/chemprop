@@ -1,81 +1,81 @@
-000 multi_target 0 0 0 0 random 100 True
-001 multi_target 0 0 0 10 random 100 True
-002 multi_target 0 0 0 50 random 100 True
-003 multi_target 0 0 10 0 random 100 True
-004 multi_target 0 0 10 10 random 100 True
-005 multi_target 0 0 10 50 random 100 True
-006 multi_target 0 0 50 0 random 100 True
-007 multi_target 0 0 50 10 random 100 True
-008 multi_target 0 0 50 50 random 100 True
-009 multi_target 10 0 0 0 random 100 True
-010 multi_target 10 0 0 10 random 100 True
-011 multi_target 10 0 0 50 random 100 True
-012 multi_target 10 0 10 0 random 100 True
-013 multi_target 10 0 10 10 random 100 True
-014 multi_target 10 0 10 50 random 100 True
-015 multi_target 10 0 50 0 random 100 True
-016 multi_target 10 0 50 10 random 100 True
-017 multi_target 10 0 50 50 random 100 True
-018 multi_target 50 0 0 0 random 100 True
-019 multi_target 50 0 0 10 random 100 True
-020 multi_target 50 0 0 50 random 100 True
-021 multi_target 50 0 10 0 random 100 True
-022 multi_target 50 0 10 10 random 100 True
-023 multi_target 50 0 10 50 random 100 True
-024 multi_target 50 0 50 0 random 100 True
-025 multi_target 50 0 50 10 random 100 True
-026 multi_target 50 0 50 50 random 100 True
-027 multi_fidelity 0 0 0 0 random 100 True
-028 multi_fidelity 0 0 0 10 random 100 True
-029 multi_fidelity 0 0 0 50 random 100 True
-030 multi_fidelity 0 0 10 0 random 100 True
-031 multi_fidelity 0 0 10 10 random 100 True
-032 multi_fidelity 0 0 10 50 random 100 True
-033 multi_fidelity 0 0 50 0 random 100 True
-034 multi_fidelity 0 0 50 10 random 100 True
-035 multi_fidelity 0 0 50 50 random 100 True
-036 multi_fidelity 10 0 0 0 random 100 True
-037 multi_fidelity 10 0 0 10 random 100 True
-038 multi_fidelity 10 0 0 50 random 100 True
-039 multi_fidelity 10 0 10 0 random 100 True
-040 multi_fidelity 10 0 10 10 random 100 True
-041 multi_fidelity 10 0 10 50 random 100 True
-042 multi_fidelity 10 0 50 0 random 100 True
-043 multi_fidelity 10 0 50 10 random 100 True
-044 multi_fidelity 10 0 50 50 random 100 True
-045 multi_fidelity 50 0 0 0 random 100 True
-046 multi_fidelity 50 0 0 10 random 100 True
-047 multi_fidelity 50 0 0 50 random 100 True
-048 multi_fidelity 50 0 10 0 random 100 True
-049 multi_fidelity 50 0 10 10 random 100 True
-050 multi_fidelity 50 0 10 50 random 100 True
-051 multi_fidelity 50 0 50 0 random 100 True
-052 multi_fidelity 50 0 50 10 random 100 True
-053 multi_fidelity 50 0 50 50 random 100 True
-054 multi_fidelity_weight_sharing 0 0 0 0 random 100 True
-055 multi_fidelity_weight_sharing 0 0 0 10 random 100 True
-056 multi_fidelity_weight_sharing 0 0 0 50 random 100 True
-057 multi_fidelity_weight_sharing 0 0 10 0 random 100 True
-058 multi_fidelity_weight_sharing 0 0 10 10 random 100 True
-059 multi_fidelity_weight_sharing 0 0 10 50 random 100 True
-060 multi_fidelity_weight_sharing 0 0 50 0 random 100 True
-061 multi_fidelity_weight_sharing 0 0 50 10 random 100 True
-062 multi_fidelity_weight_sharing 0 0 50 50 random 100 True
-063 multi_fidelity_weight_sharing 10 0 0 0 random 100 True
-064 multi_fidelity_weight_sharing 10 0 0 10 random 100 True
-065 multi_fidelity_weight_sharing 10 0 0 50 random 100 True
-066 multi_fidelity_weight_sharing 10 0 10 0 random 100 True
-067 multi_fidelity_weight_sharing 10 0 10 10 random 100 True
-068 multi_fidelity_weight_sharing 10 0 10 50 random 100 True
-069 multi_fidelity_weight_sharing 10 0 50 0 random 100 True
-070 multi_fidelity_weight_sharing 10 0 50 10 random 100 True
-071 multi_fidelity_weight_sharing 10 0 50 50 random 100 True
-072 multi_fidelity_weight_sharing 50 0 0 0 random 100 True
-073 multi_fidelity_weight_sharing 50 0 0 10 random 100 True
-074 multi_fidelity_weight_sharing 50 0 0 50 random 100 True
-075 multi_fidelity_weight_sharing 50 0 10 0 random 100 True
-076 multi_fidelity_weight_sharing 50 0 10 10 random 100 True
-077 multi_fidelity_weight_sharing 50 0 10 50 random 100 True
-078 multi_fidelity_weight_sharing 50 0 50 0 random 100 True
-079 multi_fidelity_weight_sharing 50 0 50 10 random 100 True
-080 multi_fidelity_weight_sharing 50 0 50 50 random 100 True
+000 multi_target 0 0 0 0 random 100 True 0
+001 multi_target 0 0 0 10 random 100 True 0
+002 multi_target 0 0 0 50 random 100 True 0
+003 multi_target 0 0 10 0 random 100 True 0
+004 multi_target 0 0 10 10 random 100 True 0
+005 multi_target 0 0 10 50 random 100 True 0
+006 multi_target 0 0 50 0 random 100 True 0
+007 multi_target 0 0 50 10 random 100 True 0
+008 multi_target 0 0 50 50 random 100 True 0
+009 multi_target 10 0 0 0 random 100 True 0
+010 multi_target 10 0 0 10 random 100 True 0
+011 multi_target 10 0 0 50 random 100 True 0
+012 multi_target 10 0 10 0 random 100 True 0
+013 multi_target 10 0 10 10 random 100 True 0
+014 multi_target 10 0 10 50 random 100 True 0
+015 multi_target 10 0 50 0 random 100 True 0
+016 multi_target 10 0 50 10 random 100 True 0
+017 multi_target 10 0 50 50 random 100 True 0
+018 multi_target 50 0 0 0 random 100 True 0
+019 multi_target 50 0 0 10 random 100 True 0
+020 multi_target 50 0 0 50 random 100 True 0
+021 multi_target 50 0 10 0 random 100 True 0
+022 multi_target 50 0 10 10 random 100 True 0
+023 multi_target 50 0 10 50 random 100 True 0
+024 multi_target 50 0 50 0 random 100 True 0
+025 multi_target 50 0 50 10 random 100 True 0
+026 multi_target 50 0 50 50 random 100 True 0
+027 multi_fidelity 0 0 0 0 random 100 True 0
+028 multi_fidelity 0 0 0 10 random 100 True 0
+029 multi_fidelity 0 0 0 50 random 100 True 0
+030 multi_fidelity 0 0 10 0 random 100 True 0
+031 multi_fidelity 0 0 10 10 random 100 True 0
+032 multi_fidelity 0 0 10 50 random 100 True 0
+033 multi_fidelity 0 0 50 0 random 100 True 0
+034 multi_fidelity 0 0 50 10 random 100 True 0
+035 multi_fidelity 0 0 50 50 random 100 True 0
+036 multi_fidelity 10 0 0 0 random 100 True 0
+037 multi_fidelity 10 0 0 10 random 100 True 0
+038 multi_fidelity 10 0 0 50 random 100 True 0
+039 multi_fidelity 10 0 10 0 random 100 True 0
+040 multi_fidelity 10 0 10 10 random 100 True 0
+041 multi_fidelity 10 0 10 50 random 100 True 0
+042 multi_fidelity 10 0 50 0 random 100 True 0
+043 multi_fidelity 10 0 50 10 random 100 True 0
+044 multi_fidelity 10 0 50 50 random 100 True 0
+045 multi_fidelity 50 0 0 0 random 100 True 0
+046 multi_fidelity 50 0 0 10 random 100 True 0
+047 multi_fidelity 50 0 0 50 random 100 True 0
+048 multi_fidelity 50 0 10 0 random 100 True 0
+049 multi_fidelity 50 0 10 10 random 100 True 0
+050 multi_fidelity 50 0 10 50 random 100 True 0
+051 multi_fidelity 50 0 50 0 random 100 True 0
+052 multi_fidelity 50 0 50 10 random 100 True 0
+053 multi_fidelity 50 0 50 50 random 100 True 0
+054 multi_fidelity_weight_sharing 0 0 0 0 random 100 True 0
+055 multi_fidelity_weight_sharing 0 0 0 10 random 100 True 0
+056 multi_fidelity_weight_sharing 0 0 0 50 random 100 True 0
+057 multi_fidelity_weight_sharing 0 0 10 0 random 100 True 0
+058 multi_fidelity_weight_sharing 0 0 10 10 random 100 True 0
+059 multi_fidelity_weight_sharing 0 0 10 50 random 100 True 0
+060 multi_fidelity_weight_sharing 0 0 50 0 random 100 True 0
+061 multi_fidelity_weight_sharing 0 0 50 10 random 100 True 0
+062 multi_fidelity_weight_sharing 0 0 50 50 random 100 True 0
+063 multi_fidelity_weight_sharing 10 0 0 0 random 100 True 0
+064 multi_fidelity_weight_sharing 10 0 0 10 random 100 True 0
+065 multi_fidelity_weight_sharing 10 0 0 50 random 100 True 0
+066 multi_fidelity_weight_sharing 10 0 10 0 random 100 True 0
+067 multi_fidelity_weight_sharing 10 0 10 10 random 100 True 0
+068 multi_fidelity_weight_sharing 10 0 10 50 random 100 True 0
+069 multi_fidelity_weight_sharing 10 0 50 0 random 100 True 0
+070 multi_fidelity_weight_sharing 10 0 50 10 random 100 True 0
+071 multi_fidelity_weight_sharing 10 0 50 50 random 100 True 0
+072 multi_fidelity_weight_sharing 50 0 0 0 random 100 True 0
+073 multi_fidelity_weight_sharing 50 0 0 10 random 100 True 0
+074 multi_fidelity_weight_sharing 50 0 0 50 random 100 True 0
+075 multi_fidelity_weight_sharing 50 0 10 0 random 100 True 0
+076 multi_fidelity_weight_sharing 50 0 10 10 random 100 True 0
+077 multi_fidelity_weight_sharing 50 0 10 50 random 100 True 0
+078 multi_fidelity_weight_sharing 50 0 50 0 random 100 True 0
+079 multi_fidelity_weight_sharing 50 0 50 10 random 100 True 0
+080 multi_fidelity_weight_sharing 50 0 50 50 random 100 True 0
