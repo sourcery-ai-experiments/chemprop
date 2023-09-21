@@ -57,7 +57,7 @@ def main():
     seed_everything(args.seed)
     train_val_smiles, test_smiles = split_by_prop_dict[args.split_type](df=data_df, seed=args.seed)
     train_val_df = data_df.loc[train_val_smiles]
-    train_smiles, val_smiles = split_by_prop_dict[args.split_type](df=train_val_df, seed=args.seed)
+    train_smiles, val_smiles = split_by_prop_dict["random"](df=train_val_df, seed=args.seed)
 
     print("Total dataset size:", len(data_df))
 
