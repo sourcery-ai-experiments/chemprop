@@ -29,7 +29,7 @@ def main():
             "Cannot add bias to make low fidelity data when model type is single fidelity"
         )
 
-    if args.model_type == "multi_fidelity_weight_sharing_non_diff":
+    if args.model_type == "multi_fidelity_weight_sharing_non_diff" or args.model_type == "trad_delta_ml":
         raise NotImplementedError("Not implemented yet")
 
     # make unique folder for results of each run
@@ -65,6 +65,8 @@ def main():
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
         ),
+        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "trad_ delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add method: multi-fidelity with evidential uncertainty?
@@ -148,20 +150,38 @@ def main():
         train_index = lf_train_index + hf_train_index
         test_index = lf_test_index + hf_test_index
 
-        # Setting nan to specify LF and HF
-        lf_not_hf_index = list(set(lf_train_index + lf_test_index).difference(set(hf_train_index + hf_test_index)))
-        data_df[args.hf_col_name].loc[lf_not_hf_index] = np.nan
-        if not args.lf_superset_of_hf:
-            data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
+        # If it is delta_ml then we don't need to set the LF HF values to nan, pass it in as feature
+        if args.model_type == "delta_ml":
+            # Oracle is LF data
+            train_oracle = data_df.loc[train_index][[args.lf_col_name]].values
+            test_oracle = data_df.loc[test_index][[args.lf_col_name]].values
+            train_t = data_df.loc[train_index][[args.hf_col_name]].values
+            test_t = data_df.loc[test_index][[args.hf_col_name]].values
+        
+        else:
+            # Setting nan to specify LF and HF
+            lf_not_hf_index = list(set(lf_train_index + lf_test_index).difference(set(hf_train_index + hf_test_index)))
+            data_df[args.hf_col_name].loc[lf_not_hf_index] = np.nan
+            if not args.lf_superset_of_hf:
+                data_df[args.lf_col_name].loc[hf_train_index + hf_test_index] = np.nan
+            
+            # Selecting the target values for each train and test
+            # LF column must be first, HF second to work with expected order in loss function during training
+            train_t = data_df.loc[train_index][[args.lf_col_name, args.hf_col_name]].values
+            test_t = data_df.loc[test_index][[args.lf_col_name, args.hf_col_name]].values
 
-        # Selecting the target values for each train and test
-        # LF column must be first, HF second to work with expected order in loss function during training
-        train_t = data_df.loc[train_index][[args.lf_col_name, args.hf_col_name]].values
-        test_t = data_df.loc[test_index][[args.lf_col_name, args.hf_col_name]].values
-
+    # print(data_df)
+    # print('---------------------------')
+    # print(train_t)
+    # print(train_oracle)
     # Initializing the data
-    train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
-    test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
+    if args.model_type == "delta_ml":
+        train_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(train_index, train_t, train_oracle)]
+        test_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(test_index, test_t,test_oracle)]
+
+    else:
+        train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_index, train_t)]
+        test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_index, test_t)]
 
     # TODO: (!) also do non-random split between train and val?
     train_data, val_data = train_test_split(train_data, test_size=0.11, random_state=args.seed)
@@ -419,9 +439,11 @@ def add_args(parser: ArgumentParser):
             "multi_fidelity",
             "multi_fidelity_weight_sharing",
             "multi_fidelity_non_diff",
+            "delta_ml",
+            "trad_delta_ml"
         ],
     )
-    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
+    parser.add_argument("--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv")
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_lf", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
