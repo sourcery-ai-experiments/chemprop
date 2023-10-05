@@ -202,14 +202,15 @@ class MultifidelityMPNN(ABC, pl.LightningModule):
     def training_step(self, batch: TrainingBatch, batch_idx):
         bmg, X_vd, features, targets, weights, lt_targets, gt_targets = batch
 
-        mask = targets.isfinite()
-        targets = targets.nan_to_num(nan=0.0)
+        mask_hf = targets[:, 1].isfinite()
+        mask_lf = targets[:, 0].isfinite()
+        # targets = targets.nan_to_num(nan=0.0)
 
         high_fidelity_preds, low_fidelity_preds = self((bmg, X_vd), X_f=features)
 
         # TODO: add hyperparam for tradeoff between fidelity
-        l = self.criterion.calc(high_fidelity_preds, targets[:, 1].reshape(-1, 1)).sum() + \
-            self.criterion.calc(low_fidelity_preds, targets[:, 0].reshape(-1, 1)).sum()
+        l = self.criterion.calc(high_fidelity_preds[mask_hf], targets[:, 1][mask_hf].reshape(-1, 1)).sum() + \
+            self.criterion.calc(low_fidelity_preds[mask_lf], targets[:, 0][mask_lf].reshape(-1, 1)).sum()
 
         self.log("train/loss", l, prog_bar=True)
 
