@@ -457,7 +457,7 @@ def add_args(parser: ArgumentParser):
             "trad_delta_ml",
         ],
     )
-    parser.add_argument("--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv")
+    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_lf", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
