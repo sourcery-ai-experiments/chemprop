@@ -69,6 +69,21 @@ def main():
         print("Val size:", len(val_smiles))
         print("Test size:", len(test_smiles))
 
+    elif args.model_type == "delta_ml":
+        # HF is target and LF is oracle
+        target_col_names = [args.hf_col_name]
+        oracle_col_names = [args.lf_col_name]
+        data_df = create_low_fidelity(data_df, args)
+        # No need to seperate into HF and LF
+
+
+    elif args.model_type == "trad_delta_ml":
+        # HF is target and LF is oracle
+        data_df = create_low_fidelity(data_df, args)
+        data_df["delta"] = data_df[args.hf_col_name] - data_df[args.lf_col_name]
+        target_col_names = "delta"
+
+    
     else:
         # LF column must be first, HF second to work with expected order in loss function during training
         target_col_names = [args.lf_col_name, args.hf_col_name]
@@ -83,15 +98,30 @@ def main():
         print("HF/LF val size:", len(val_smiles))
         print("HF/LF test size:", len(test_smiles))
 
+
     # Selecting the target values for train, val, and test
     train_targets = data_df.loc[train_smiles][target_col_names].values
     val_targets = data_df.loc[val_smiles][target_col_names].values
     test_targets = data_df.loc[test_smiles][target_col_names].values
 
-    # Initializing the data
-    train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_smiles, train_targets)]
-    val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(val_smiles, val_targets)]
-    test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_smiles, test_targets)]
+
+    if args.model_type == "delta_ml":
+        #Does the val and test need oracles?
+        #Fetching LF as oracles
+        train_oracles = data_df.loc[train_smiles][oracle_col_names].values
+        val_oracles = data_df.loc[val_smiles][oracle_col_names].values
+        test_oracles = data_df.loc[test_smiles][oracle_col_names].values
+
+        # Initializing the data
+        train_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(train_smiles, train_targets, train_oracles)]
+        val_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(val_smiles, val_targets, val_oracles)]
+        test_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(test_smiles, test_targets, test_oracles)]
+
+    else:
+        # Initializing the data
+        train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_smiles, train_targets)]
+        val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(val_smiles, val_targets)]
+        test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_smiles, test_targets)]
 
     mgf = featurizers.MoleculeFeaturizer()
     train_dset = data.MoleculeDataset(train_data, mgf)
@@ -248,6 +278,8 @@ def choose_model(model_type):
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
         ),
+        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add method: multi-fidelity with evidential uncertainty?
@@ -421,6 +453,8 @@ def add_args(parser: ArgumentParser):
             "multi_fidelity",
             "multi_fidelity_weight_sharing",
             "multi_fidelity_non_diff",
+            "delta_ml",
+            "trad_delta_ml",
         ],
     )
     parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
