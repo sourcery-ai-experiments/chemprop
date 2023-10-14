@@ -104,10 +104,8 @@ def main():
         target_col_names = [args.lf_col_name, args.hf_col_name]
         data_df = create_low_fidelity(data_df, args)
         export_and_plot_hf_lf_data(data_df, args)
-        print(data_df)
         data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(data_df, train_smiles, args)
         train_smiles = list(set(list(lf_train_smiles) + list(hf_train_smiles)))
-        print(data_df)
 
         # Print sizes of datasets and splits
         print("HF train size:", len(hf_train_smiles))
