@@ -181,7 +181,6 @@ def main():
         hf_test_dset = data.MoleculeDataset(hf_test_data, mgf)
 
         if args.scale_data:
-            # Is this correct?
             hf_train_scaler = hf_train_dset.normalize_targets()
             _ = hf_val_dset.normalize_targets(hf_train_scaler)
             _ = hf_test_dset.normalize_targets(hf_train_scaler)
