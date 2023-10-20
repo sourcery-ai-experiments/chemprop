@@ -75,6 +75,9 @@ def main():
         oracle_col_names = [args.lf_col_name]
         data_df = create_low_fidelity(data_df, args)
         # No need to seperate into HF and LF
+        print("HF/Oracle train size:", len(train_smiles))
+        print("HF/Oracle val size:", len(val_smiles))
+        print("HF/Oracle test size:", len(test_smiles))
 
 
     elif args.model_type == "trad_delta_ml":
@@ -83,20 +86,40 @@ def main():
         data_df["delta"] = data_df[args.hf_col_name] - data_df[args.lf_col_name]
         target_col_names = "delta"
 
-    
-    else:
-        # LF column must be first, HF second to work with expected order in loss function during training
-        target_col_names = [args.lf_col_name, args.hf_col_name]
-        data_df = create_low_fidelity(data_df, args)
-        export_and_plot_hf_lf_data(data_df, args)
-        data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(data_df, train_smiles, args)
-        train_smiles = list(set(list(lf_train_smiles) + list(hf_train_smiles)))
+        print("HF/Oracle train size:", len(train_smiles))
+        print("HF/Oracle val size:", len(val_smiles))
+        print("HF/Oracle test size:", len(test_smiles))
 
-        # Print sizes of datasets and splits
-        print("HF train size:", len(hf_train_smiles))
-        print("LF train size:", len(lf_train_smiles))
-        print("HF/LF val size:", len(val_smiles))
-        print("HF/LF test size:", len(test_smiles))
+    else:
+
+        data_df = create_low_fidelity(data_df, args)
+        data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(data_df, train_smiles, args)
+
+        if args.model_type == "transfer":
+            # To remove some redundancy, "train_targets, val_targets, test_targets" are "lf_train_targets, lf_val_targets, lf_test_targets"
+            target_col_names = [args.lf_col_name]
+            # Can seperate using the same function.
+            data_df, lf_val_smiles, hf_val_smiles = separate_hf_and_lf_train(data_df, val_smiles, args)
+            data_df, lf_test_smiles, hf_test_smiles = separate_hf_and_lf_train(data_df, test_smiles, args)
+
+            print("HF train size:", len(hf_train_smiles))
+            print("LF train size:", len(lf_train_smiles))
+            print("HF val size:", len(hf_val_smiles))
+            print("LF val size:", len(lf_val_smiles))
+            print("HF test size:", len(hf_test_smiles))
+            print("LF test size:", len(lf_test_smiles))
+
+        else:
+            # LF column must be first, HF second to work with expected order in loss function during training
+            target_col_names = [args.lf_col_name, args.hf_col_name]
+            export_and_plot_hf_lf_data(data_df, args)
+            train_smiles = list(set(list(lf_train_smiles) + list(hf_train_smiles)))
+
+            # Print sizes of datasets and splits
+            print("HF train size:", len(hf_train_smiles))
+            print("LF train size:", len(lf_train_smiles))
+            print("HF/LF val size:", len(val_smiles))
+            print("HF/LF test size:", len(test_smiles))
 
 
     # Selecting the target values for train, val, and test
@@ -104,9 +127,14 @@ def main():
     val_targets = data_df.loc[val_smiles][target_col_names].values
     test_targets = data_df.loc[test_smiles][target_col_names].values
 
+    if args.model_type == "transfer":
+        # Regular train, val, test targets are the lf versions in the case of transfer learning
+        hf_train_targets = data_df.loc[hf_train_smiles][[args.hf_col_name]].values
+        hf_test_targets = data_df.loc[hf_test_smiles][[args.hf_col_name]].values
+        hf_val_targets = data_df.loc[hf_val_smiles][[args.hf_col_name]].values
+
 
     if args.model_type == "delta_ml":
-        #Does the val and test need oracles?
         #Fetching LF as oracles
         train_oracles = data_df.loc[train_smiles][oracle_col_names].values
         val_oracles = data_df.loc[val_smiles][oracle_col_names].values
@@ -122,8 +150,17 @@ def main():
         train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_smiles, train_targets)]
         val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(val_smiles, val_targets)]
         test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_smiles, test_targets)]
+        
+        if args.model_type == "transfer":
+        
+            #Redundancy removed if hf_train_data = train_data 
+            hf_train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_train_smiles, hf_train_targets)]
+            hf_val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_val_smiles, hf_val_targets)]
+            hf_test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_test_smiles, hf_test_targets)]
 
     mgf = featurizers.MoleculeFeaturizer()
+
+
     train_dset = data.MoleculeDataset(train_data, mgf)
     val_dset = data.MoleculeDataset(val_data, mgf)
     test_dset = data.MoleculeDataset(test_data, mgf)
@@ -131,11 +168,26 @@ def main():
     if args.scale_data:
         train_scaler = train_dset.normalize_targets()
         _ = val_dset.normalize_targets(train_scaler)
-        test_scaler = test_dset.normalize_targets()
+        _ = test_dset.normalize_targets(train_scaler)
 
     train_loader = data.MolGraphDataLoader(train_dset, batch_size=50, num_workers=12)
     val_loader = data.MolGraphDataLoader(val_dset, batch_size=50, num_workers=12, shuffle=False)
     test_loader = data.MolGraphDataLoader(test_dset, batch_size=50, num_workers=12, shuffle=False)
+
+    if args.model_type == "transfer":
+
+        hf_train_dset = data.MoleculeDataset(hf_train_data, mgf)
+        hf_val_dset = data.MoleculeDataset(hf_val_data, mgf)
+        hf_test_dset = data.MoleculeDataset(hf_test_data, mgf)
+
+        if args.scale_data:
+            hf_train_scaler = hf_train_dset.normalize_targets()
+            _ = hf_val_dset.normalize_targets(hf_train_scaler)
+            _ = hf_test_dset.normalize_targets(hf_train_scaler)
+
+        hf_train_loader = data.MolGraphDataLoader(hf_train_dset, batch_size=50, num_workers=12)
+        hf_val_loader = data.MolGraphDataLoader(hf_val_dset, batch_size=50, num_workers=12, shuffle=False)
+        hf_test_loader = data.MolGraphDataLoader(hf_test_dset, batch_size=50, num_workers=12, shuffle=False)
 
     # Train
     seed_everything(args.seed)
@@ -147,27 +199,55 @@ def main():
         devices=1,
         max_epochs=args.num_epochs,
     )
+
     trainer.fit(mpnn, train_loader, val_loader)
-
     preds = trainer.predict(mpnn, test_loader)
-
     test_smis = [x.smi for x in test_data]
 
-    if args.model_type == "single_fidelity":
+    if args.model_type == "transfer":
+        
+        trainer.fit(mpnn, hf_train_loader, hf_val_loader)
+        hf_preds = trainer.predict(mpnn, hf_test_loader)
+        hf_test_smis = [x.smi for x in hf_test_data]
+        
+
+    if args.model_type in ["single_fidelity", "transfer", "delta_ml", "trad_delta_ml", "transfer"]:
         preds = [x[0].item() for x in preds]
         targets = [x.targets[0] for x in test_data]
 
         if args.scale_data:
-            preds = test_scaler.inverse_transform(np.array(preds).reshape(-1, 1))
-            targets = test_scaler.inverse_transform(np.array(targets).reshape(-1, 1))
+            preds = train_scaler.inverse_transform(np.array(preds).reshape(-1, 1))
+            targets = train_scaler.inverse_transform(np.array(targets).reshape(-1, 1))
         else:
             preds = np.array(preds)
             targets = np.array(targets)
 
+        if args.model_type == "transfer":
+
+            hf_preds = [x[0].item() for x in hf_preds]
+            hf_targets = [x.targets[0] for x in hf_test_data]
+
+            if args.scale_data:
+                hf_preds = hf_train_scaler.inverse_transform(np.array(hf_preds).reshape(-1, 1))
+                hf_targets = hf_train_scaler.inverse_transform(np.array(hf_targets).reshape(-1, 1))
+            else:
+                hf_preds = np.array(hf_preds)
+                hf_targets = np.array(hf_targets)
+
+
         print("Test set")
         mae, rmse, r2 = eval_metrics(targets, preds)
-        metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
+        
+        if args.model_type == "transfer":
+            hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)  
+
+            metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
+                                   "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
+        else:
+            metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
                                    "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
+        
+        
         metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
@@ -186,6 +266,7 @@ def main():
                 f"{args.hf_col_name}_preds": preds.flatten(),
             }
         )
+
     else:
         if args.model_type == "multi_target":
             preds = np.array([x[0].numpy()[0] for x in preds])
@@ -196,8 +277,8 @@ def main():
         targets = np.array([x.targets for x in test_data])
 
         if args.scale_data:
-            preds = test_scaler.inverse_transform(preds)
-            targets = test_scaler.inverse_transform(targets)
+            preds = train_scaler.inverse_transform(preds)
+            targets = train_scaler.inverse_transform(targets)
 
         targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
 
@@ -280,6 +361,7 @@ def choose_model(model_type):
         ),
         "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1)
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add method: multi-fidelity with evidential uncertainty?
@@ -455,6 +537,7 @@ def add_args(parser: ArgumentParser):
             "multi_fidelity_non_diff",
             "delta_ml",
             "trad_delta_ml",
+            "transfer",
         ],
     )
     parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
