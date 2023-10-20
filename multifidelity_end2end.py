@@ -96,7 +96,7 @@ def main():
         data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(data_df, train_smiles, args)
 
         if args.model_type == "transfer":
-
+            # To remove some redundancy, "train_targets, val_targets, test_targets" are "lf_train_targets, lf_val_targets, lf_test_targets"
             target_col_names = [args.lf_col_name]
             # Can seperate using the same function.
             data_df, lf_val_smiles, hf_val_smiles = separate_hf_and_lf_train(data_df, val_smiles, args)
