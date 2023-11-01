@@ -166,7 +166,7 @@ def main():
     test_dset = data.MoleculeDataset(test_data, mgf)
 
     if args.scale_data:
-        train_scaler = train_dset.normalize_targets()
+        train_scaler = train_dset.normalize_targets()  # TODO: (!) error for trad_delta_ml - need to reshape with (-1, 1)
         _ = val_dset.normalize_targets(train_scaler)
         _ = test_dset.normalize_targets(train_scaler)
 
@@ -200,7 +200,7 @@ def main():
         max_epochs=args.num_epochs,
     )
 
-    trainer.fit(mpnn, train_loader, val_loader)
+    trainer.fit(mpnn, train_loader, val_loader)  # TODO: (!) matmul dimension error for delta_ml
     preds = trainer.predict(mpnn, test_loader)
     test_smis = [x.smi for x in test_data]
 
@@ -236,7 +236,7 @@ def main():
 
 
         print("Test set")
-        mae, rmse, r2 = eval_metrics(targets, preds)
+        mae, rmse, r2 = eval_metrics(targets, preds)  # TODO: (!) error when some target values are NaN for transfer learning with LF/HF overlap False
         
         if args.model_type == "transfer":
             hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)  
