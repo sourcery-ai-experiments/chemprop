@@ -353,7 +353,7 @@ def choose_model(model_type):
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
         ),
-        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1, n_features=1),
         "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1)
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
