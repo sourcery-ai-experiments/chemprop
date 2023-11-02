@@ -79,11 +79,11 @@ def main():
         print("HF/Oracle val size:", len(val_smiles))
         print("HF/Oracle test size:", len(test_smiles))
 
-
     elif args.model_type == "trad_delta_ml":
         # HF is target and LF is oracle
         data_df = create_low_fidelity(data_df, args)
         data_df["delta"] = data_df[args.hf_col_name] - data_df[args.lf_col_name]
+        data_df["delta"] = data_df["delta"].apply(lambda x: [x])
         target_col_names = "delta"
 
         print("HF/Oracle train size:", len(train_smiles))
@@ -121,7 +121,6 @@ def main():
             print("HF/LF val size:", len(val_smiles))
             print("HF/LF test size:", len(test_smiles))
 
-
     # Selecting the target values for train, val, and test
     train_targets = data_df.loc[train_smiles][target_col_names].values
     val_targets = data_df.loc[val_smiles][target_col_names].values
@@ -133,9 +132,8 @@ def main():
         hf_test_targets = data_df.loc[hf_test_smiles][[args.hf_col_name]].values
         hf_val_targets = data_df.loc[hf_val_smiles][[args.hf_col_name]].values
 
-
     if args.model_type == "delta_ml":
-        #Fetching LF as oracles
+        # Fetching LF as oracles
         train_oracles = data_df.loc[train_smiles][oracle_col_names].values
         val_oracles = data_df.loc[val_smiles][oracle_col_names].values
         test_oracles = data_df.loc[test_smiles][oracle_col_names].values
@@ -150,23 +148,22 @@ def main():
         train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_smiles, train_targets)]
         val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(val_smiles, val_targets)]
         test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_smiles, test_targets)]
-        
+
         if args.model_type == "transfer":
-        
-            #Redundancy removed if hf_train_data = train_data 
+
+            # Redundancy removed if hf_train_data = train_data
             hf_train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_train_smiles, hf_train_targets)]
             hf_val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_val_smiles, hf_val_targets)]
             hf_test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_test_smiles, hf_test_targets)]
 
     mgf = featurizers.MoleculeFeaturizer()
 
-
     train_dset = data.MoleculeDataset(train_data, mgf)
     val_dset = data.MoleculeDataset(val_data, mgf)
     test_dset = data.MoleculeDataset(test_data, mgf)
 
     if args.scale_data:
-        train_scaler = train_dset.normalize_targets()  # TODO: (!) error for trad_delta_ml - need to reshape with (-1, 1)
+        train_scaler = train_dset.normalize_targets()
         _ = val_dset.normalize_targets(train_scaler)
         _ = test_dset.normalize_targets(train_scaler)
 
@@ -205,11 +202,10 @@ def main():
     test_smis = [x.smi for x in test_data]
 
     if args.model_type == "transfer":
-        
+
         trainer.fit(mpnn, hf_train_loader, hf_val_loader)
         hf_preds = trainer.predict(mpnn, hf_test_loader)
         hf_test_smis = [x.smi for x in hf_test_data]
-        
 
     if args.model_type in ["single_fidelity", "transfer", "delta_ml", "trad_delta_ml", "transfer"]:
         preds = [x[0].item() for x in preds]
@@ -234,20 +230,18 @@ def main():
                 hf_preds = np.array(hf_preds)
                 hf_targets = np.array(hf_targets)
 
-
         print("Test set")
         mae, rmse, r2 = eval_metrics(targets, preds)  # TODO: (!) error when some target values are NaN for transfer learning with LF/HF overlap False
-        
+
         if args.model_type == "transfer":
-            hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)  
+            hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)
 
             metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
-                                   "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
+                                       "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
         else:
             metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
-                                   "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
-        
-        
+                                       "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
+
         metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
