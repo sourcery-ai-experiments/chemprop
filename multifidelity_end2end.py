@@ -220,6 +220,11 @@ def main():
 
         if args.model_type == "transfer":
 
+            # only keep targets, smiles, and preds that are not NaN
+            preds = preds[~np.isnan(targets)]
+            test_smis = [x for x, y in zip(test_smis, targets) if not np.isnan(y)]
+            targets = targets[~np.isnan(targets)]
+
             hf_preds = [x[0].item() for x in hf_preds]
             hf_targets = [x.targets[0] for x in hf_test_data]
 
@@ -231,7 +236,7 @@ def main():
                 hf_targets = np.array(hf_targets)
 
         print("Test set")
-        mae, rmse, r2 = eval_metrics(targets, preds)  # TODO: (!) error when some target values are NaN for transfer learning with LF/HF overlap False
+        mae, rmse, r2 = eval_metrics(targets, preds)
 
         if args.model_type == "transfer":
             hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)
