@@ -44,13 +44,14 @@ class MPNN(ABC, pl.LightningModule):
         init_lr: float = 1e-4,
         max_lr: float = 1e-3,
         final_lr: float = 1e-4,
+        n_features: int = 0,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["mpn_block"])
 
         self.mpn_block = mpn_block
         self.ffn = self.build_ffn(
-            mpn_block.output_dim,
+            mpn_block.output_dim + n_features,
             n_tasks * self.n_targets,
             ffn_hidden_dim,
             ffn_num_layers,

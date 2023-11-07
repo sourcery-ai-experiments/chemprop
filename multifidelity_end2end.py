@@ -79,11 +79,11 @@ def main():
         print("HF/Oracle val size:", len(val_smiles))
         print("HF/Oracle test size:", len(test_smiles))
 
-
     elif args.model_type == "trad_delta_ml":
         # HF is target and LF is oracle
         data_df = create_low_fidelity(data_df, args)
         data_df["delta"] = data_df[args.hf_col_name] - data_df[args.lf_col_name]
+        data_df["delta"] = data_df["delta"].apply(lambda x: [x])
         target_col_names = "delta"
 
         print("HF/Oracle train size:", len(train_smiles))
@@ -121,7 +121,6 @@ def main():
             print("HF/LF val size:", len(val_smiles))
             print("HF/LF test size:", len(test_smiles))
 
-
     # Selecting the target values for train, val, and test
     train_targets = data_df.loc[train_smiles][target_col_names].values
     val_targets = data_df.loc[val_smiles][target_col_names].values
@@ -133,9 +132,8 @@ def main():
         hf_test_targets = data_df.loc[hf_test_smiles][[args.hf_col_name]].values
         hf_val_targets = data_df.loc[hf_val_smiles][[args.hf_col_name]].values
 
-
     if args.model_type == "delta_ml":
-        #Fetching LF as oracles
+        # Fetching LF as oracles
         train_oracles = data_df.loc[train_smiles][oracle_col_names].values
         val_oracles = data_df.loc[val_smiles][oracle_col_names].values
         test_oracles = data_df.loc[test_smiles][oracle_col_names].values
@@ -150,16 +148,15 @@ def main():
         train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(train_smiles, train_targets)]
         val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(val_smiles, val_targets)]
         test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(test_smiles, test_targets)]
-        
+
         if args.model_type == "transfer":
-        
-            #Redundancy removed if hf_train_data = train_data 
+
+            # Redundancy removed if hf_train_data = train_data
             hf_train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_train_smiles, hf_train_targets)]
             hf_val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_val_smiles, hf_val_targets)]
             hf_test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_test_smiles, hf_test_targets)]
 
     mgf = featurizers.MoleculeFeaturizer()
-
 
     train_dset = data.MoleculeDataset(train_data, mgf)
     val_dset = data.MoleculeDataset(val_data, mgf)
@@ -200,16 +197,15 @@ def main():
         max_epochs=args.num_epochs,
     )
 
-    trainer.fit(mpnn, train_loader, val_loader)
+    trainer.fit(mpnn, train_loader, val_loader)  # TODO: (!) matmul dimension error for delta_ml
     preds = trainer.predict(mpnn, test_loader)
     test_smis = [x.smi for x in test_data]
 
     if args.model_type == "transfer":
-        
+
         trainer.fit(mpnn, hf_train_loader, hf_val_loader)
         hf_preds = trainer.predict(mpnn, hf_test_loader)
         hf_test_smis = [x.smi for x in hf_test_data]
-        
 
     if args.model_type in ["single_fidelity", "transfer", "delta_ml", "trad_delta_ml", "transfer"]:
         preds = [x[0].item() for x in preds]
@@ -224,6 +220,11 @@ def main():
 
         if args.model_type == "transfer":
 
+            # only keep targets, smiles, and preds that are not NaN
+            preds = preds[~np.isnan(targets)]
+            test_smis = [x for x, y in zip(test_smis, targets) if not np.isnan(y)]
+            targets = targets[~np.isnan(targets)]
+
             hf_preds = [x[0].item() for x in hf_preds]
             hf_targets = [x.targets[0] for x in hf_test_data]
 
@@ -234,20 +235,18 @@ def main():
                 hf_preds = np.array(hf_preds)
                 hf_targets = np.array(hf_targets)
 
-
         print("Test set")
         mae, rmse, r2 = eval_metrics(targets, preds)
-        
+
         if args.model_type == "transfer":
-            hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)  
+            hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)
 
             metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
-                                   "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
+                                       "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
         else:
             metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
-                                   "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
-        
-        
+                                       "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
+
         metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
@@ -359,7 +358,7 @@ def choose_model(model_type):
         "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
             mp_block_hf, n_tasks=1
         ),
-        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1, n_features=1),
         "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1)
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
