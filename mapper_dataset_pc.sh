@@ -19,8 +19,8 @@ echo "Seed: " ${11}
 python multifidelity_end2end.py \
 --model_type $2 \
 --data_file /home/gridsan/kgreenman/mf_benchmark/chemprop/tests/data/$3.csv \
---hf_col_name peakwavs_max \
---lf_col_name energy_max_osc_nm \
+--hf_col_name DR \
+--lf_col_name SD \
 --scale_data True \
 --save_test_plot False \
 --num_epochs 30 \
