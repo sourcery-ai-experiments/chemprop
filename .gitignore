@@ -177,3 +177,7 @@ chemprop/_version.py
 test_v2.py
 my_testing.sh
 *.tar.gz
+
+dataset_test_*.out
+tests/data/SolProp_v1.2_Data/CombiSolv*
+tests/data/SolProp_v1.2_Data/*.xlsx
