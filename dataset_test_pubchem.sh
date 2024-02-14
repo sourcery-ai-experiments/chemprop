@@ -5,7 +5,7 @@ python multifidelity_end2end.py \
 --lf_col_name SD \
 --scale_data True \
 --save_test_plot False \
---num_epochs 30 \
+--num_epochs 3 \
 --export_train_and_val False \
 --add_descriptor_bias_to_make_lf 0 \
 --add_pn_bias_to_make_lf 0 \

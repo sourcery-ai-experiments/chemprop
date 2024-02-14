@@ -1,11 +1,11 @@
 python multifidelity_end2end.py \
---model_type multi_fidelity \
+--model_type single_fidelity \
 --data_file /home/kpg/multifidelity/mf_benchmark/chemprop/tests/data/SolProp_v1.2_Data/dHsolv_cosmo_expt.csv \
 --hf_col_name dHsolv_expt \
 --lf_col_name dHsolv_cosmo \
 --scale_data True \
 --save_test_plot False \
---num_epochs 30 \
+--num_epochs 3 \
 --export_train_and_val False \
 --add_descriptor_bias_to_make_lf 0 \
 --add_pn_bias_to_make_lf 0 \
