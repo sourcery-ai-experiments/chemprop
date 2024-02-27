@@ -271,7 +271,9 @@ def main():
             preds = np.array([x[0].numpy()[0] for x in preds])
         elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":  # TODO: (!) will this also work for multi-fidelity non-differentiable?
             preds = np.array([[[x[0][0].numpy(), x[0][1].numpy()]] for x in preds]).reshape(len(preds), 2)
-
+        elif args.model_type in ["evidentialmf", "evidentialdual", "mvemultifidelity"]:
+            preds = np.array([[[x[0][0][0][0].numpy(), x[0][1][0][0].numpy()]] for x in preds]).reshape(len(preds), 2)
+            
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
         targets = np.array([x.targets for x in test_data])
 
@@ -282,19 +284,25 @@ def main():
         targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
 
         for target, pred in zip(targets, preds):
-            # LF
+            # LF should be hf
             if not np.isnan(target[0]):
                 targets_lf.append(target[0])
-                preds_lf.append(pred[0])
-            # HF
+                preds_lf.append(pred[1])
+            # HF should be lf
             if not np.isnan(target[1]):
                 targets_hf.append(target[1])
-                preds_hf.append(pred[1])
+                preds_hf.append(pred[0])
 
         targets_hf = np.array(targets_hf)
         targets_lf = np.array(targets_lf)
         preds_hf = np.array(preds_hf)
         preds_lf = np.array(preds_lf)
+
+        print("HF", preds_hf[19:30] - targets_hf[19:30])
+        print("lF", preds_lf[19:30] - targets_lf[19:30])
+
+        #print(targets_lf, preds_lf)
+
 
         print("High Fidelity - Test set")
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
@@ -360,7 +368,10 @@ def choose_model(model_type):
         ),
         "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1, n_features=1),
         "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
-        "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1)
+        "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1),
+        "evidentialmf": models.EvidentialMultifidelityMPNN(mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf),
+        "evidentialdual": models.EvidentialDualMF(mp_block_hf, n_tasks=4, mpn_block_low_fidelity=mp_block_lf),
+        "mvemultifidelity": models.MveMultifidelity(mp_block_hf, n_tasks=2, mpn_block_low_fidelity=mp_block_lf)
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add method: multi-fidelity with evidential uncertainty?
@@ -537,9 +548,12 @@ def add_args(parser: ArgumentParser):
             "delta_ml",
             "trad_delta_ml",
             "transfer",
+            "evidentialmf",
+            "evidentialdual",
+            "mvemultifidelity"
         ],
     )
-    parser.add_argument("--data_file", type=str, default="tests/data/gdb11_0.001.csv")
+    parser.add_argument("--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv")
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
     parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
     parser.add_argument("--lf_col_name", type=str, default="h298_lf", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]

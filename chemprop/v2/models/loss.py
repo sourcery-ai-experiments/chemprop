@@ -110,6 +110,10 @@ class EvidentialLoss(LossFunction):
     def calc(self, preds: Tensor, targets: Tensor, **kwargs) -> Tensor:
         mu, v, alpha, beta = preds.split(preds.shape[1] // 4, dim=1)
 
+        alpha = torch.clamp(alpha, min=1.001)
+        beta = torch.clamp(beta, min=0.0001)
+        v = torch.clamp(v, min=0.0001)
+
         residuals = targets - mu
         twoBlambda = 2 * beta * (1 + v)
 

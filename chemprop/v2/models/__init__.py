@@ -16,4 +16,7 @@ from .models import (
     RegressionMPNN,
     MveRegressionMPNN,
     SpectralMPNN,
+    EvidentialMultifidelityMPNN,
+    EvidentialDualMF,
+    MveMultifidelity,
 )
