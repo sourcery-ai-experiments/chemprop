@@ -47,6 +47,7 @@ class MultifidelityMPNN(ABC, pl.LightningModule):
         init_lr: float = 1e-4,
         max_lr: float = 1e-3,
         final_lr: float = 1e-4,
+        loss_mod: int = 1,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=["mpn_block", "mpn_block_low_fidelity"])
@@ -83,6 +84,7 @@ class MultifidelityMPNN(ABC, pl.LightningModule):
         self.init_lr = init_lr
         self.max_lr = max_lr
         self.final_lr = final_lr
+        self.loss_mod = loss_mod
 
     @classmethod
     @property
@@ -212,7 +214,7 @@ class MultifidelityMPNN(ABC, pl.LightningModule):
 
         # TODO: add hyperparam for tradeoff between fidelity
         l = self.criterion.calc(high_fidelity_preds[mask_hf], targets[:, 1][mask_hf].reshape(-1, 1)).sum() + \
-            self.criterion.calc(low_fidelity_preds[mask_lf], targets[:, 0][mask_lf].reshape(-1, 1)).sum()
+            self.loss_mod * self.criterion.calc(low_fidelity_preds[mask_lf], targets[:, 0][mask_lf].reshape(-1, 1)).sum()
 
         self.log("train/loss", l, prog_bar=True)
 

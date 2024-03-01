@@ -24,7 +24,11 @@ def main():
     add_args(parser)
     args = parser.parse_args()
 
-    if args.model_type == "single_fidelity" and (args.add_pn_bias_to_make_lf > 0 or args.add_gauss_noise_to_make_lf > 0 or args.add_descriptor_bias_to_make_lf > 0):
+    if args.model_type == "single_fidelity" and (
+        args.add_pn_bias_to_make_lf > 0
+        or args.add_gauss_noise_to_make_lf > 0
+        or args.add_descriptor_bias_to_make_lf > 0
+    ):
         raise ValueError(
             "Cannot add bias to make low fidelity data when model type is single fidelity"
         )
@@ -45,10 +49,11 @@ def main():
     with open("args.json", "w") as f:
         json.dump(args_dict, f, indent=4)
 
-    mpnn = choose_model(args.model_type)
+    mpnn = choose_model(args.model_type, args.loss_mod)
 
     # Data
-    data_df = pd.read_csv(args.data_file, index_col="smiles")
+    data_df = pd.read_csv(args.data_file).drop_duplicates(subset=["smiles"])
+    data_df.set_index("smiles", inplace=True)
 
     # Train-Val-Test Splits
     # Val and test are the same for LF and HF; train is separated later
@@ -92,15 +97,26 @@ def main():
 
     else:
 
-        data_df = create_low_fidelity(data_df, args)
-        data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(data_df, train_smiles, args)
+        if data_df.shape[1] == 1:  # This means no LF column exists
+            data_df = create_low_fidelity(data_df, args)
+
+        # print(data_df)
+        data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(
+            data_df, train_smiles, args
+        )
+
+        # print(data_df)
 
         if args.model_type == "transfer":
             # To remove some redundancy, "train_targets, val_targets, test_targets" are "lf_train_targets, lf_val_targets, lf_test_targets"
             target_col_names = [args.lf_col_name]
             # Can seperate using the same function.
-            data_df, lf_val_smiles, hf_val_smiles = separate_hf_and_lf_train(data_df, val_smiles, args)
-            data_df, lf_test_smiles, hf_test_smiles = separate_hf_and_lf_train(data_df, test_smiles, args)
+            data_df, lf_val_smiles, hf_val_smiles = separate_hf_and_lf_train(
+                data_df, val_smiles, args
+            )
+            data_df, lf_test_smiles, hf_test_smiles = separate_hf_and_lf_train(
+                data_df, test_smiles, args
+            )
 
             print("HF train size:", len(hf_train_smiles))
             print("LF train size:", len(lf_train_smiles))
@@ -139,9 +155,18 @@ def main():
         test_oracles = data_df.loc[test_smiles][oracle_col_names].values
 
         # Initializing the data
-        train_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(train_smiles, train_targets, train_oracles)]
-        val_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(val_smiles, val_targets, val_oracles)]
-        test_data = [data.MoleculeDatapoint(smi, t, features=o) for smi, t, o in zip(test_smiles, test_targets, test_oracles)]
+        train_data = [
+            data.MoleculeDatapoint(smi, t, features=o)
+            for smi, t, o in zip(train_smiles, train_targets, train_oracles)
+        ]
+        val_data = [
+            data.MoleculeDatapoint(smi, t, features=o)
+            for smi, t, o in zip(val_smiles, val_targets, val_oracles)
+        ]
+        test_data = [
+            data.MoleculeDatapoint(smi, t, features=o)
+            for smi, t, o in zip(test_smiles, test_targets, test_oracles)
+        ]
 
     else:
         # Initializing the data
@@ -152,9 +177,15 @@ def main():
         if args.model_type == "transfer":
 
             # Redundancy removed if hf_train_data = train_data
-            hf_train_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_train_smiles, hf_train_targets)]
-            hf_val_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_val_smiles, hf_val_targets)]
-            hf_test_data = [data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_test_smiles, hf_test_targets)]
+            hf_train_data = [
+                data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_train_smiles, hf_train_targets)
+            ]
+            hf_val_data = [
+                data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_val_smiles, hf_val_targets)
+            ]
+            hf_test_data = [
+                data.MoleculeDatapoint(smi, t) for smi, t in zip(hf_test_smiles, hf_test_targets)
+            ]
 
     mgf = featurizers.MoleculeFeaturizer()
 
@@ -183,8 +214,12 @@ def main():
             _ = hf_test_dset.normalize_targets(hf_train_scaler)
 
         hf_train_loader = data.MolGraphDataLoader(hf_train_dset, batch_size=50, num_workers=12)
-        hf_val_loader = data.MolGraphDataLoader(hf_val_dset, batch_size=50, num_workers=12, shuffle=False)
-        hf_test_loader = data.MolGraphDataLoader(hf_test_dset, batch_size=50, num_workers=12, shuffle=False)
+        hf_val_loader = data.MolGraphDataLoader(
+            hf_val_dset, batch_size=50, num_workers=12, shuffle=False
+        )
+        hf_test_loader = data.MolGraphDataLoader(
+            hf_test_dset, batch_size=50, num_workers=12, shuffle=False
+        )
 
     # Train
     seed_everything(args.seed)
@@ -241,11 +276,27 @@ def main():
         if args.model_type == "transfer":
             hf_mae, hf_rmse, hf_r2 = eval_metrics(hf_targets, hf_preds)
 
-            metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
-                                       "MAE_lf": [mae], "RMSE_lf": [rmse], "R2_lf": [r2]})
+            metrics_df = pd.DataFrame(
+                {
+                    "MAE_hf": [hf_mae],
+                    "RMSE_hf": [hf_rmse],
+                    "R2_hf": [hf_r2],
+                    "MAE_lf": [mae],
+                    "RMSE_lf": [rmse],
+                    "R2_lf": [r2],
+                }
+            )
         else:
-            metrics_df = pd.DataFrame({"MAE_hf": [mae], "RMSE_hf": [rmse], "R2_hf": [r2],
-                                       "MAE_lf": [np.nan], "RMSE_lf": [np.nan], "R2_lf": [np.nan]})
+            metrics_df = pd.DataFrame(
+                {
+                    "MAE_hf": [mae],
+                    "RMSE_hf": [rmse],
+                    "R2_hf": [r2],
+                    "MAE_lf": [np.nan],
+                    "RMSE_lf": [np.nan],
+                    "R2_lf": [np.nan],
+                }
+            )
 
         metrics_df.to_csv("test_metrics.csv", index=False)
 
@@ -253,9 +304,14 @@ def main():
             plt.scatter(targets, preds)
             plt.xlabel("Target")
             plt.ylabel("Prediction")
-            plt.text(min(targets), max(preds),
-                     f"MAE: {mae:.2f}\nRMSE: {rmse:.2f}\nR^2: {r2:.2f}",
-                     fontsize=12, ha='left', va='top')
+            plt.text(
+                min(targets),
+                max(preds),
+                f"MAE: {mae:.2f}\nRMSE: {rmse:.2f}\nR^2: {r2:.2f}",
+                fontsize=12,
+                ha="left",
+                va="top",
+            )
             plt.savefig("mf_test_preds.png")
 
         test_df = pd.DataFrame(
@@ -269,11 +325,18 @@ def main():
     else:
         if args.model_type == "multi_target":
             preds = np.array([x[0].numpy()[0] for x in preds])
-        elif args.model_type == "multi_fidelity" or args.model_type == "multi_fidelity_weight_sharing":  # TODO: (!) will this also work for multi-fidelity non-differentiable?
-            preds = np.array([[[x[0][0].numpy(), x[0][1].numpy()]] for x in preds]).reshape(len(preds), 2)
+        elif (
+            args.model_type == "multi_fidelity"
+            or args.model_type == "multi_fidelity_weight_sharing"
+        ):  # TODO: (!) will this also work for multi-fidelity non-differentiable?
+            preds = np.array([[[x[0][0].numpy(), x[0][1].numpy()]] for x in preds]).reshape(
+                len(preds), 2
+            )
         elif args.model_type in ["evidentialmf", "evidentialdual", "mvemultifidelity"]:
-            preds = np.array([[[x[0][0][0][0].numpy(), x[0][1][0][0].numpy()]] for x in preds]).reshape(len(preds), 2)
-            
+            preds = np.array(
+                [[[x[0][0][0][0].numpy(), x[0][1][0][0].numpy()]] for x in preds]
+            ).reshape(len(preds), 2)
+
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
         targets = np.array([x.targets for x in test_data])
 
@@ -299,17 +362,22 @@ def main():
         preds_lf = np.array(preds_lf)
 
         print("HF", preds_hf[19:30] - targets_hf[19:30])
-        print("lF", preds_lf[19:30] - targets_lf[19:30])
-
-        #print(targets_lf, preds_lf)
-
+        print("LF", preds_lf[19:30] - targets_lf[19:30])
 
         print("High Fidelity - Test set")
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
         print("Low Fidelity - Test set")
         lf_mae, lf_rmse, lf_r2 = eval_metrics(targets_lf, preds_lf)
-        metrics_df = pd.DataFrame({"MAE_hf": [hf_mae], "RMSE_hf": [hf_rmse], "R2_hf": [hf_r2],
-                                   "MAE_lf": [lf_mae], "RMSE_lf": [lf_rmse], "R2_lf": [lf_r2]})
+        metrics_df = pd.DataFrame(
+            {
+                "MAE_hf": [hf_mae],
+                "RMSE_hf": [hf_rmse],
+                "R2_hf": [hf_r2],
+                "MAE_lf": [lf_mae],
+                "RMSE_lf": [lf_rmse],
+                "R2_lf": [lf_r2],
+            }
+        )
         metrics_df.to_csv("test_metrics.csv", index=False)
 
         if args.save_test_plot:
@@ -318,17 +386,27 @@ def main():
             axes[0].scatter(targets_hf, preds_hf, alpha=0.3, label="High Fidelity")
             axes[0].set_xlabel("Target")
             axes[0].set_ylabel("Prediction")
-            axes[0].text(min(targets_hf), max(preds_hf),
-                         f"MAE: {hf_mae:.2f}\nRMSE: {hf_rmse:.2f}\nR^2: {hf_r2:.2f}",
-                         fontsize=12, ha='left', va='top')
+            axes[0].text(
+                min(targets_hf),
+                max(preds_hf),
+                f"MAE: {hf_mae:.2f}\nRMSE: {hf_rmse:.2f}\nR^2: {hf_r2:.2f}",
+                fontsize=12,
+                ha="left",
+                va="top",
+            )
             axes[0].set_title("High Fidelity")
 
             axes[1].scatter(targets_lf, preds_lf, alpha=0.3, label="Low Fidelity")
             axes[1].set_xlabel("Target")
             axes[1].set_ylabel("Prediction")
-            axes[1].text(min(targets_lf), max(preds_lf),
-                         f"MAE: {lf_mae:.2f}\nRMSE: {lf_rmse:.2f}\nR^2: {lf_r2:.2f}",
-                         fontsize=12, ha='left', va='top')
+            axes[1].text(
+                min(targets_lf),
+                max(preds_lf),
+                f"MAE: {lf_mae:.2f}\nRMSE: {lf_rmse:.2f}\nR^2: {lf_r2:.2f}",
+                fontsize=12,
+                ha="left",
+                va="top",
+            )
             axes[1].set_title("Low Fidelity")
 
             plt.subplots_adjust(left=0.1, bottom=0.1, right=0.9, top=0.9, wspace=0.4, hspace=0.4)
@@ -345,33 +423,37 @@ def main():
             }
         )
 
-    test_df.to_csv("mf_test_preds.csv", index=False, float_format='%.6f')
+    test_df.to_csv("mf_test_preds.csv", index=False, float_format="%.6f")
 
     if args.export_train_and_val:
         export_train_and_val(args, train_data, val_data, train_scaler)
 
 
-def choose_model(model_type):
-    mp_block_hf = modules.molecule_block()  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'? (also on line below)
+def choose_model(model_type, loss_mod=1):
+    mp_block_hf = (
+        modules.molecule_block()
+    )  # TODO: use aggregation='sum' or 'norm' instead of default 'mean'? (also on line below)
     mp_block_lf = modules.molecule_block()
 
     model_dict = {
         "single_fidelity": models.RegressionMPNN(mp_block_hf, n_tasks=1),
-        "multi_target": models.RegressionMPNN(
-            mp_block_hf, n_tasks=2
-        ),
+        "multi_target": models.RegressionMPNN(mp_block_hf, n_tasks=2),
         "multi_fidelity": models.MultifidelityRegressionMPNN(
-            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf, loss_mod=loss_mod
         ),
-        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(
-            mp_block_hf, n_tasks=1
-        ),
+        "multi_fidelity_weight_sharing": models.MultifidelityRegressionMPNN(mp_block_hf, n_tasks=1),
         "delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1, n_features=1),
         "trad_delta_ml": models.RegressionMPNN(mp_block_hf, n_tasks=1),
         "transfer": models.RegressionMPNN(mp_block_hf, n_tasks=1),
-        "evidentialmf": models.EvidentialMultifidelityMPNN(mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf),
-        "evidentialdual": models.EvidentialDualMF(mp_block_hf, n_tasks=4, mpn_block_low_fidelity=mp_block_lf),
-        "mvemultifidelity": models.MveMultifidelity(mp_block_hf, n_tasks=2, mpn_block_low_fidelity=mp_block_lf)
+        "evidentialmf": models.EvidentialMultifidelityMPNN(
+            mp_block_hf, n_tasks=1, mpn_block_low_fidelity=mp_block_lf, loss_mod=loss_mod
+        ),
+        "evidentialdual": models.EvidentialDualMF(
+            mp_block_hf, n_tasks=4, mpn_block_low_fidelity=mp_block_lf
+        ),
+        "mvemultifidelity": models.MveMultifidelity(
+            mp_block_hf, n_tasks=2, mpn_block_low_fidelity=mp_block_lf, loss_mod=loss_mod
+        ),
         # "multi_fidelity_weight_sharing_non_diff": ,  # TODO: (!) multi-fidelity non-differentiable feature
     }
     # TODO: add method: multi-fidelity with evidential uncertainty?
@@ -386,39 +468,57 @@ def create_low_fidelity(data_df, args):
 
     if args.add_pn_bias_to_make_lf > 0:
         # Creating the coefficients for the polynomial function
-        coefficients = np.random.uniform(-1, 1, args.add_pn_bias_to_make_lf + 1)  # need to add 1 because the one coefficient is for x^0
+        coefficients = np.random.uniform(
+            -1, 1, args.add_pn_bias_to_make_lf + 1
+        )  # need to add 1 because the one coefficient is for x^0
         # Adding bias calculated from the polynomial function of HF to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(coefficients, list(data_df[args.hf_col_name]))
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + np.polyval(
+            coefficients, list(data_df[args.hf_col_name])
+        )
 
     if args.add_constant_bias_to_make_lf != 0.0:
         # Add the constant bias to HF to make data_df LF column
         data_df[args.lf_col_name] = data_df[args.lf_col_name] + args.add_constant_bias_to_make_lf
 
     if args.add_gauss_noise_to_make_lf > 0.0:
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(df_len=len(data_df[args.lf_col_name]),
-                                                                            std=args.add_gauss_noise_to_make_lf,
-                                                                            seed=args.seed)
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + gauss_noise(
+            df_len=len(data_df[args.lf_col_name]),
+            std=args.add_gauss_noise_to_make_lf,
+            seed=args.seed,
+        )
 
     if args.add_descriptor_bias_to_make_lf != 0.0:
         descriptors = [
-            Descriptors.qed, Descriptors.MolWt, Descriptors.BalabanJ,
-            Descriptors.BertzCT, Descriptors.HallKierAlpha, Descriptors.Ipc,
-            Descriptors.Kappa1, Descriptors.Kappa2, Descriptors.Kappa3,
-            Descriptors.LabuteASA, Descriptors.TPSA, Descriptors.MolLogP,
-            Descriptors.MolMR
+            Descriptors.qed,
+            Descriptors.MolWt,
+            Descriptors.BalabanJ,
+            Descriptors.BertzCT,
+            Descriptors.HallKierAlpha,
+            Descriptors.Ipc,
+            Descriptors.Kappa1,
+            Descriptors.Kappa2,
+            Descriptors.Kappa3,
+            Descriptors.LabuteASA,
+            Descriptors.TPSA,
+            Descriptors.MolLogP,
+            Descriptors.MolMR,
         ]
         # Creating the weight descriptor pair
-        coefficients = np.random.uniform(-1, 1, len(descriptors)) * args.add_descriptor_bias_to_make_lf
+        coefficients = (
+            np.random.uniform(-1, 1, len(descriptors)) * args.add_descriptor_bias_to_make_lf
+        )
         descriptors_coefficients = list(zip(descriptors, coefficients))
         # Adding bias calculated from normalized descriptors to data_df LF column
-        data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(data_df, descriptors_coefficients)
+        data_df[args.lf_col_name] = data_df[args.lf_col_name] + descriptor_bias(
+            data_df, descriptors_coefficients
+        )
 
     return data_df
 
 
 def export_and_plot_hf_lf_data(data_df, args):
 
-    data_df.to_csv("lf_hf_targets.csv", float_format='%.6f')
+    data_df.to_csv("lf_hf_targets.csv", float_format="%.6f")
 
     lf = data_df[args.lf_col_name].values
     hf = data_df[args.hf_col_name].values
@@ -462,8 +562,8 @@ def separate_hf_and_lf_train(data_df, train_smiles, args):
     hf_train_df.drop(args.lf_col_name, inplace=True, axis=1)
     lf_train_df.drop(args.hf_col_name, inplace=True, axis=1)
 
-    hf_train_smiles = hf_train_df.index
     lf_train_smiles = lf_train_df.index
+    hf_train_smiles = hf_train_df.index
 
     # Setting nan to specify LF and HF
     lf_not_hf_train_smiles = list(set(lf_train_smiles).difference(set(hf_train_smiles)))
@@ -506,8 +606,8 @@ def export_train_and_val(args, train_data, val_data, train_scaler):
 
     train_df = pd.DataFrame(train_dict)
     val_df = pd.DataFrame(val_dict)
-    train_df.to_csv("mf_train.csv", index=False, float_format='%.6f')
-    val_df.to_csv("mf_val.csv", index=False, float_format='%.6f')
+    train_df.to_csv("mf_train.csv", index=False, float_format="%.6f")
+    val_df.to_csv("mf_val.csv", index=False, float_format="%.6f")
 
     return
 
@@ -526,12 +626,12 @@ def eval_metrics(targets, preds):
 def str2bool(v):
     if isinstance(v, bool):
         return v
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise ArgumentTypeError('Boolean value expected.')
+        raise ArgumentTypeError("Boolean value expected.")
 
 
 def add_args(parser: ArgumentParser):
@@ -550,28 +650,55 @@ def add_args(parser: ArgumentParser):
             "transfer",
             "evidentialmf",
             "evidentialdual",
-            "mvemultifidelity"
+            "mvemultifidelity",
         ],
     )
-    parser.add_argument("--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv")
-    # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv"]
-    parser.add_argument("--hf_col_name", type=str, default="h298")  # choices=["h298", "lambda_maxosc_tddft"]
-    parser.add_argument("--lf_col_name", type=str, default="h298_lf", required=False)  # choices=["h298_bias_1", "lambda_maxosc_stda"]
+    parser.add_argument(
+        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv"
+    )
+    # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv", "dHsolv.csv", "pubchem.csv", "lambda.csv"]
+    parser.add_argument(
+        "--hf_col_name", type=str, default="h298"
+    )  # choices=["h298", "lambda_maxosc_tddft", dHsolv_expt]
+    parser.add_argument(
+        "--lf_col_name", type=str, default="h298_lf", required=False
+    )  # choices=["h298_bias_1", "lambda_maxosc_stda", "dHsolv_cosmo"]
     parser.add_argument("--scale_data", type=str2bool, default=False)
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
     parser.add_argument("--export_train_and_val", type=str2bool, default=False)
-    parser.add_argument("--add_pn_bias_to_make_lf", type=int, default=0, help="order of the polynomial in x, for order >= 1")
-    parser.add_argument("--add_constant_bias_to_make_lf", type=float, default=0.0, help="use this instead of `--add_pn_bias_to_make_lf` for order = 0")
+    parser.add_argument(
+        "--add_pn_bias_to_make_lf",
+        type=int,
+        default=0,
+        help="order of the polynomial in x, for order >= 1",
+    )
+    parser.add_argument(
+        "--add_constant_bias_to_make_lf",
+        type=float,
+        default=0.0,
+        help="use this instead of `--add_pn_bias_to_make_lf` for order = 0",
+    )
     parser.add_argument("--add_gauss_noise_to_make_lf", type=float, default=0.0)
-    parser.add_argument("--add_descriptor_bias_to_make_lf", type=float, default=0.0, help="descriptor weights range from -N to N")
+    parser.add_argument(
+        "--add_descriptor_bias_to_make_lf",
+        type=float,
+        default=0.0,
+        help="descriptor weights range from -N to N",
+    )
     # TODO: add atom bias?
     # TODO: (!) add arguments for h298, molwt, atom splits
-    parser.add_argument("--split_type", type=str, default="random", choices=["random", "scaffold", "h298", "molwt", "atom"])
+    parser.add_argument(
+        "--split_type",
+        type=str,
+        default="random",
+        choices=["random", "scaffold", "h298", "molwt", "atom"],
+    )
     parser.add_argument("--lf_hf_size_ratio", type=int, default=1)  # <N> : 1 = LF : HF
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument("--loss_mod", type=int, default=1)
     return
 
 
