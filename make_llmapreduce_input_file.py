@@ -2,8 +2,8 @@ command_str_list = []
 i=0
 for seed in [0, 1, 2]:
     for model_type in ["multi_fidelity", "evidentialmf", "mvemultifidelity"]:
-        for loss_mod in [2, 5, 10, 30, 50]:
-            for gauss_noise in [5]:
+        for loss_mod in [1, 2, 5, 10, 30, 50]:
+            for gauss_noise in [30]:
                 command_str = f"{i} {model_type} {loss_mod} {seed} {gauss_noise}"
                 command_str_list.append(command_str)
                 i += 1

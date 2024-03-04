@@ -20,4 +20,4 @@ python multifidelity_end2end.py \
 --export_train_and_val False \
 --loss_mod $3\
 --seed $4\
---add_gauss_noise_to_make_lf $5 2>&1
+--add_gauss_noise_to_make_lf $5 > $6 2>&1
