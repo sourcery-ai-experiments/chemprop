@@ -23,6 +23,9 @@ def main():
     parser = ArgumentParser()
     add_args(parser)
     args = parser.parse_args()
+    seed_everything(args.seed)
+    np.random.seed(args.seed)
+
 
     if args.model_type == "single_fidelity" and (
         args.add_pn_bias_to_make_lf > 0
@@ -59,7 +62,6 @@ def main():
     # Val and test are the same for LF and HF; train is separated later
     # TODO: (!) scaffold splits appear to not be reproducible???
     # TODO: (!) add in **kwargs from dicts for non-random split types
-    seed_everything(args.seed)
     train_val_smiles, test_smiles = split_by_prop_dict[args.split_type](df=data_df, seed=args.seed)
     train_val_df = data_df.loc[train_val_smiles]
     train_smiles, val_smiles = split_by_prop_dict["random"](df=train_val_df, seed=args.seed)
@@ -97,7 +99,7 @@ def main():
 
     else:
 
-        if data_df.shape[1] == 1:  # This means no LF column exists
+        if data_df.shape[1] == 1:  # This means if no LF column exists
             data_df = create_low_fidelity(data_df, args)
 
         # print(data_df)
@@ -222,7 +224,6 @@ def main():
         )
 
     # Train
-    seed_everything(args.seed)
     trainer = pl.Trainer(
         logger=True,
         enable_checkpointing=False,
@@ -361,8 +362,8 @@ def main():
         preds_hf = np.array(preds_hf)
         preds_lf = np.array(preds_lf)
 
-        print("HF", preds_hf[19:30] - targets_hf[19:30])
-        print("LF", preds_lf[19:30] - targets_lf[19:30])
+        # print("HF", preds_hf[19:30] - targets_hf[19:30])
+        # print("LF", preds_lf[19:30] - targets_lf[19:30])
 
         print("High Fidelity - Test set")
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
@@ -654,14 +655,14 @@ def add_args(parser: ArgumentParser):
         ],
     )
     parser.add_argument(
-        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv"
+        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/lambda.csv"
     )
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv", "dHsolv.csv", "pubchem.csv", "lambda.csv"]
     parser.add_argument(
-        "--hf_col_name", type=str, default="h298"
+        "--hf_col_name", type=str, default="energy_max_osc_nm"
     )  # choices=["h298", "lambda_maxosc_tddft", dHsolv_expt]
     parser.add_argument(
-        "--lf_col_name", type=str, default="h298_lf", required=False
+        "--lf_col_name", type=str, default="peakwavs_max", required=False
     )  # choices=["h298_bias_1", "lambda_maxosc_stda", "dHsolv_cosmo"]
     parser.add_argument("--scale_data", type=str2bool, default=False)
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
@@ -698,7 +699,7 @@ def add_args(parser: ArgumentParser):
     parser.add_argument("--lf_superset_of_hf", type=str2bool, default=False)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--results_dir", type=str, default="results")
-    parser.add_argument("--loss_mod", type=int, default=1)
+    parser.add_argument("--loss_mod", type=float, default=1)
     return
 
 

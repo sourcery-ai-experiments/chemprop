@@ -101,9 +101,9 @@ class EvidentialMultifidelityMPNN(MultifidelityRegressionMPNN):
         alphas = F.softplus(alphas) + 1
         betas = F.softplus(betas)
 
-        #alphas = torch.clamp(alphas, min=1.0001)
-        #betas = torch.clamp(betas, min=0.0001)
-        #lambdas = torch.clamp(lambdas, min=0.0001)
+        alphas = torch.clamp(alphas, min=1.0001)
+        betas = torch.clamp(betas, min=0.0001)
+        lambdas = torch.clamp(lambdas, min=0.0001)
 
         al_u = betas/(alphas-1)
         ep_u = al_u/lambdas
@@ -127,8 +127,8 @@ class EvidentialMultifidelityMPNN(MultifidelityRegressionMPNN):
 
         total_loss = self.loss_mod*lf_loss + hf_loss
 
-        self.log("LF train/loss", lf_loss, prog_bar=True)
-        self.log("HF train/loss", hf_loss, prog_bar=True)
+        #self.log("LF train/loss", lf_loss, prog_bar=True)
+        #51self.log("HF train/loss", hf_loss, prog_bar=True)
 
         return total_loss
     
@@ -189,8 +189,8 @@ class MveMultifidelity(MultifidelityRegressionMPNN):
         total_loss = self.loss_mod*lf_loss + hf_loss
         #print(lf_loss, hf_loss)
         
-        self.log("LF train/loss", lf_loss, prog_bar=True)
-        self.log("HF train/loss", hf_loss, prog_bar=True)
+        #self.log("LF train/loss", lf_loss, prog_bar=True)
+        #self.log("HF train/loss", hf_loss, prog_bar=True)
 
         return total_loss
 
