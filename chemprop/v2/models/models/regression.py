@@ -78,7 +78,7 @@ class EvidentialMultifidelityMPNN(MultifidelityRegressionMPNN):
                          loss_mod=loss_mod)
 
         self.ffn_high_fidelity = self.build_ffn(
-            mpn_block.output_dim + 3,  # +1 for LF preds, +3 for Uncertainty Features
+            mpn_block.output_dim + 1,  # +1 for LF preds, +3 for Uncertainty Features
             1,
         )
         self.ffn_low_fidelity = self.build_ffn(
