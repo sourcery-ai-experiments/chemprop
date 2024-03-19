@@ -109,7 +109,7 @@ class EvidentialMultifidelityMPNN(MultifidelityRegressionMPNN):
         ep_u = al_u/lambdas
 
         extra_features = torch.cat((means, al_u, ep_u), 1)
-        hf_output = self.ffn_high_fidelity(self.fingerprint(inputs, X_f=extra_features))
+        hf_output = self.ffn_high_fidelity(self.fingerprint(inputs, X_f=means))
 
         return (hf_output, lf_output)
 

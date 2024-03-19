@@ -655,15 +655,15 @@ def add_args(parser: ArgumentParser):
         ],
     )
     parser.add_argument(
-        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/lambda.csv"
+        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv"
     )
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv", "dHsolv.csv", "pubchem.csv", "lambda.csv"]
     parser.add_argument(
-        "--hf_col_name", type=str, default="energy_max_osc_nm"
-    )  # choices=["h298", "lambda_maxosc_tddft", dHsolv_expt]
+        "--hf_col_name", type=str, default="h298"
+    )  # choices=["h298", "lambda_maxosc_tddft", dHsolv_expt, "energy_max_osc_nm"]
     parser.add_argument(
-        "--lf_col_name", type=str, default="peakwavs_max", required=False
-    )  # choices=["h298_bias_1", "lambda_maxosc_stda", "dHsolv_cosmo"]
+        "--lf_col_name", type=str, default="h298lf", required=False
+    )  # choices=["h298_bias_1", "lambda_maxosc_stda", "dHsolv_cosmo", "peakwavs_max"]
     parser.add_argument("--scale_data", type=str2bool, default=False)
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
     parser.add_argument("--num_epochs", type=int, default=30)
