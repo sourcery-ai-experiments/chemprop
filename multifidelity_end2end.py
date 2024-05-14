@@ -11,7 +11,7 @@ import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 import torch
 from rdkit import Chem
-from rdkit.Chem import Descriptors, rdFingerprintGenerator
+from rdkit.Chem import Descriptors
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
 
