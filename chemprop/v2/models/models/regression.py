@@ -68,7 +68,7 @@ class EvidentialMultifidelityMPNN(MultifidelityRegressionMPNN):
 
     _DEFAULT_CRITERION = "evidential"
 
-    def __init__(self, mpn_block, n_tasks=1, mpn_block_low_fidelity=None, init_lr=0.01, max_lr=0.05, final_lr=0.001, loss_mod=1):
+    def __init__(self, mpn_block, n_tasks=1, mpn_block_low_fidelity=None, init_lr=0.1, max_lr=0.5, final_lr=0.001, loss_mod=1):
         super().__init__(mpn_block=mpn_block, 
                          mpn_block_low_fidelity=mpn_block_low_fidelity, 
                          n_tasks=n_tasks, 

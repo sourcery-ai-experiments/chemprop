@@ -10,13 +10,16 @@ import pandas as pd
 import pytorch_lightning as pl
 from pytorch_lightning import seed_everything
 import torch
-from rdkit.Chem import Descriptors
+from rdkit import Chem
+from rdkit.Chem import Descriptors, rdFingerprintGenerator
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
 
 from chemprop.v2 import data, featurizers, models
 from chemprop.v2.models import modules
 from noisefunctions import descriptor_bias, gauss_noise
 from splitfunctions import split_by_prop_dict
+from kernel_helper import *
 
 
 def main():
@@ -25,7 +28,6 @@ def main():
     args = parser.parse_args()
     seed_everything(args.seed)
     np.random.seed(args.seed)
-
 
     if args.model_type == "single_fidelity" and (
         args.add_pn_bias_to_make_lf > 0
@@ -52,11 +54,19 @@ def main():
     with open("args.json", "w") as f:
         json.dump(args_dict, f, indent=4)
 
-    mpnn = choose_model(args.model_type, args.loss_mod)
-
-    # Data
     data_df = pd.read_csv(args.data_file).drop_duplicates(subset=["smiles"])
     data_df.set_index("smiles", inplace=True)
+
+    if args.model_type != "kernel":
+        mpnn = choose_model(args.model_type, args.loss_mod)
+
+    # hf_mean = np.average(data_df[args.hf_col_name])
+    # hf_std = np.std(data_df[args.hf_col_name])
+    # lf_mean = np.average(data_df[args.lf_col_name])
+    # lf_std = np.std(data_df[args.lf_col_name])
+
+    # data_df[args.hf_col_name] = (data_df[args.hf_col_name] - hf_mean)/hf_std
+    # data_df[args.lf_col_name] = (data_df[args.lf_col_name] - lf_mean)/lf_std
 
     # Train-Val-Test Splits
     # Val and test are the same for LF and HF; train is separated later
@@ -65,6 +75,9 @@ def main():
     train_val_smiles, test_smiles = split_by_prop_dict[args.split_type](df=data_df, seed=args.seed)
     train_val_df = data_df.loc[train_val_smiles]
     train_smiles, val_smiles = split_by_prop_dict["random"](df=train_val_df, seed=args.seed)
+
+    if data_df.shape[1] == 1:  # This means if no LF column exists
+        data_df = create_low_fidelity(data_df, args)
 
     print("Total dataset size:", len(data_df))
 
@@ -80,17 +93,15 @@ def main():
         # HF is target and LF is oracle
         target_col_names = [args.hf_col_name]
         oracle_col_names = [args.lf_col_name]
-        data_df = create_low_fidelity(data_df, args)
         # No need to seperate into HF and LF
         print("HF/Oracle train size:", len(train_smiles))
         print("HF/Oracle val size:", len(val_smiles))
         print("HF/Oracle test size:", len(test_smiles))
 
-    elif args.model_type == "trad_delta_ml":
+    elif args.model_type in ["trad_delta_ml", "kernel"]:
         # HF is target and LF is oracle
-        data_df = create_low_fidelity(data_df, args)
         data_df["delta"] = data_df[args.hf_col_name] - data_df[args.lf_col_name]
-        data_df["delta"] = data_df["delta"].apply(lambda x: [x])
+        #data_df["delta"] = data_df["delta"].apply(lambda x: [x])
         target_col_names = "delta"
 
         print("HF/Oracle train size:", len(train_smiles))
@@ -99,15 +110,9 @@ def main():
 
     else:
 
-        if data_df.shape[1] == 1:  # This means if no LF column exists
-            data_df = create_low_fidelity(data_df, args)
-
-        # print(data_df)
         data_df, lf_train_smiles, hf_train_smiles = separate_hf_and_lf_train(
             data_df, train_smiles, args
         )
-
-        # print(data_df)
 
         if args.model_type == "transfer":
             # To remove some redundancy, "train_targets, val_targets, test_targets" are "lf_train_targets, lf_val_targets, lf_test_targets"
@@ -143,6 +148,12 @@ def main():
     train_targets = data_df.loc[train_smiles][target_col_names].values
     val_targets = data_df.loc[val_smiles][target_col_names].values
     test_targets = data_df.loc[test_smiles][target_col_names].values
+
+    if args.model_type == "kernel":
+        #For Kernel Ridge Regression
+        train_lf_targets = data_df.loc[train_smiles][args.lf_col_name].values
+        test_hf_targets = data_df.loc[test_smiles][args.hf_col_name].values
+        test_lf_targets = data_df.loc[test_smiles][args.lf_col_name].values
 
     if args.model_type == "transfer":
         # Regular train, val, test targets are the lf versions in the case of transfer learning
@@ -224,18 +235,23 @@ def main():
         )
 
     # Train
-    trainer = pl.Trainer(
-        logger=True,
-        enable_checkpointing=False,
-        enable_progress_bar=True,
-        accelerator="gpu",
-        devices=1,
-        max_epochs=args.num_epochs,
-    )
+    if args.model_type != "kernel":
+        trainer = pl.Trainer(
+            logger=True,
+            enable_checkpointing=False,
+            enable_progress_bar=True,
+            accelerator="gpu",
+            devices=1,
+            max_epochs=args.num_epochs,
+        )
 
-    trainer.fit(mpnn, train_loader, val_loader)  # TODO: (!) matmul dimension error for delta_ml
-    preds = trainer.predict(mpnn, test_loader)
-    test_smis = [x.smi for x in test_data]
+        trainer.fit(mpnn, train_loader, val_loader)  # TODO: (!) matmul dimension error for delta_ml
+        preds = trainer.predict(mpnn, test_loader)
+        test_smis = [x.smi for x in test_data]
+    else:
+        preds = kernel_end2end(train_smiles, test_smiles, train_lf_targets, train_targets)
+        test_smis = test_smiles
+
 
     if args.model_type == "transfer":
 
@@ -339,31 +355,39 @@ def main():
             ).reshape(len(preds), 2)
 
         # Both HF and LF targets are identical if the only difference in the original HF and LF was a bias term -- this is not a bug -- once normalized, the network should learn both the same way
-        targets = np.array([x.targets for x in test_data])
+        if args.model_type != "kernel":
+            targets = np.array([x.targets for x in test_data])
 
-        if args.scale_data:
-            preds = train_scaler.inverse_transform(preds)
-            targets = train_scaler.inverse_transform(targets)
+            if args.scale_data:
+                preds = train_scaler.inverse_transform(preds)
+                targets = train_scaler.inverse_transform(targets)
 
-        targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
+            targets_lf, targets_hf, preds_lf, preds_hf = [], [], [], []
 
-        for target, pred in zip(targets, preds):
-            # LF should be hf
-            if not np.isnan(target[0]):
-                targets_lf.append(target[0])
-                preds_lf.append(pred[1])
-            # HF should be lf
-            if not np.isnan(target[1]):
-                targets_hf.append(target[1])
-                preds_hf.append(pred[0])
+            for target, pred in zip(targets, preds):
+                # LF should be hf
+                if not np.isnan(target[0]):
+                    targets_lf.append(target[0])
+                    preds_lf.append(pred[1])
+                # HF should be lf
+                if not np.isnan(target[1]):
+                    targets_hf.append(target[1])
+                    preds_hf.append(pred[0])
 
-        targets_hf = np.array(targets_hf)
-        targets_lf = np.array(targets_lf)
-        preds_hf = np.array(preds_hf)
-        preds_lf = np.array(preds_lf)
+            targets_hf = np.array(targets_hf)
+            targets_lf = np.array(targets_lf)
+            preds_hf = np.array(preds_hf)
+            preds_lf = np.array(preds_lf)
 
-        # print("HF", preds_hf[19:30] - targets_hf[19:30])
-        # print("LF", preds_lf[19:30] - targets_lf[19:30])
+        else:
+            targets_hf = np.array(test_hf_targets)
+            targets_lf = np.array(test_lf_targets)
+            preds_hf = np.array(preds[0])
+            preds_lf = np.array(preds[1])
+
+            #This is so things don't break in line 444-446
+            targets = np.array([[i,j] for i,j in zip(targets_lf,targets_hf)])
+            preds = np.array([[i,j] for i,j in zip(preds_lf,preds_hf)])
 
         print("High Fidelity - Test set")
         hf_mae, hf_rmse, hf_r2 = eval_metrics(targets_hf, preds_hf)
@@ -612,7 +636,6 @@ def export_train_and_val(args, train_data, val_data, train_scaler):
 
     return
 
-
 def eval_metrics(targets, preds):
     mae = mean_absolute_error(targets, preds)
     rmse = mean_squared_error(targets, preds, squared=False)
@@ -652,17 +675,18 @@ def add_args(parser: ArgumentParser):
             "evidentialmf",
             "evidentialdual",
             "mvemultifidelity",
+            "kernel"
         ],
     )
     parser.add_argument(
-        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/gdb11_0.001.csv"
+        "--data_file", type=str, default="/home/temujin/chemprop-mf/tests/data/lambda.csv"
     )
     # choices=["multifidelity_joung_stda_tddft.csv", "gdb11_0.0001.csv" (too small), "gdb11_0.0001.csv", "dHsolv.csv", "pubchem.csv", "lambda.csv"]
     parser.add_argument(
-        "--hf_col_name", type=str, default="h298"
+        "--hf_col_name", type=str, default="energy_max_osc_nm"
     )  # choices=["h298", "lambda_maxosc_tddft", dHsolv_expt, "energy_max_osc_nm"]
     parser.add_argument(
-        "--lf_col_name", type=str, default="h298lf", required=False
+        "--lf_col_name", type=str, default="peakwavs_max", required=False
     )  # choices=["h298_bias_1", "lambda_maxosc_stda", "dHsolv_cosmo", "peakwavs_max"]
     parser.add_argument("--scale_data", type=str2bool, default=False)
     parser.add_argument("--save_test_plot", type=str2bool, default=False)
